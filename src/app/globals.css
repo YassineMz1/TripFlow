@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
+  /* Light theme defaults */
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --foreground: #0b1220; /* near-slate-900 */
+  --muted-foreground: #475569; /* slate-600 */
+  --border: rgba(0,0,0,0.15);
+  --surface: rgba(0,0,0,0.04); /* subtle surfaces in light */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: rgba(15, 22, 36, 1);
+    --foreground: #ffffff;
+    --muted-foreground: rgba(255,255,255,0.70);
+    --border: rgba(255,255,255,0.25);
+    --surface: rgba(255,255,255,0.10); /* subtle surfaces in dark */
   }
+}
+
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #0b1220;
+  --muted-foreground: #475569;
+  --border: rgba(0,0,0,0.15);
+  --surface: rgba(0,0,0,0.04);
+}
+
+[data-theme="dark"] {
+  --background: rgba(15, 22, 36, 1);
+  --foreground: #ffffff;
+  --muted-foreground: rgba(255,255,255,0.70);
+  --border: rgba(255,255,255,0.25);
+  --surface: rgba(255,255,255,0.10);
+}
+
+html, body, #__next {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", "Noto Sans", "Liberation Sans", sans-serif);
 }
+
+/* Hide scrollbars on the carousel for a clean mobile look */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* end of globals */
+
+/* Smooth theme transition (scoped to common elements to avoid jitter) */
+.theme-transition,
+.theme-transition :is(body, header, main, footer, nav, section, div, button, input, textarea, a) {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+/* Opt-out helper for elements that shouldn't animate colors (e.g., logo) */
+.no-theme-transition, .no-theme-transition * {
+  transition: none !important;
+}
+
