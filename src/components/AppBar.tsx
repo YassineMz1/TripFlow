@@ -3,6 +3,7 @@ import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import ProfileMenu from "./ProfileMenu";
 import { useLang, type Lang } from "../lib/useLang";
+import { useTranslation } from "../lib/translation";
 import { usePathname } from "next/navigation";
 
 export default function AppBar({ initialLang, initialTheme }: { initialLang?: Lang; initialTheme?: "light" | "dark" }) {
@@ -11,16 +12,7 @@ export default function AppBar({ initialLang, initialTheme }: { initialLang?: La
   const [lang] = useLang(initialLang);
   const isRoot = pathname === "/";
   if (isRoot) return null;
-  const t = (k: string) => {
-    const dict: Record<string, Record<string, string>> = {
-      en: { navHome: "Home", navTrips: "My trips", navExplore: "Explore" },
-      fr: { navHome: "Accueil", navTrips: "Mes voyages", navExplore: "Explorer" },
-      es: { navHome: "Inicio", navTrips: "Mis viajes", navExplore: "Explorar" },
-      de: { navHome: "Start", navTrips: "Meine Reisen", navExplore: "Entdecken" },
-    };
-    const d = dict[lang] || dict.en;
-    return d[k] || dict.en[k] || k;
-  };
+  const { t } = useTranslation();
 
   return (
     <header
@@ -37,14 +29,23 @@ export default function AppBar({ initialLang, initialTheme }: { initialLang?: La
             <Link href="/home" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navHome")}</Link>
             <Link href="#" className="hover:opacity-90">{t("navTrips")}</Link>
             <Link href="#" className="hover:opacity-90">{t("navExplore")}</Link>
+            {/* Prominent Translate button next to Explore */}
+            <Link
+              href="/translateVoice"
+              className="ml-1 px-2 py-1 rounded-md text-sm font-medium text-[var(--accent)] hover:bg-[rgba(46,167,217,0.06)] transition-colors"
+              aria-label="Translate"
+            >
+              Translate
+            </Link>
           </nav>
         </div>
 
         {/* Center spacer to keep layout symmetric */}
         <div />
 
-        {/* Right: profile menu + theme toggle at the very end */}
+        {/* Right: translate shortcut, profile menu + theme toggle at the very end */}
         <div className="flex items-center justify-end gap-3">
+          {/* ...existing code (ProfileMenu, ThemeToggle) ... */}
           <ProfileMenu />
           <ThemeToggle size="sm" initialTheme={initialTheme} />
         </div>

@@ -9,10 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "franc-min": "^6.2.0",
     "next": "15.5.4",
     "next-intl": "^4.3.9",
     "react": "19.1.0",
     "react-dom": "19.1.0"
+  },
+  "dependenciesMeta": {
+    "franc": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
