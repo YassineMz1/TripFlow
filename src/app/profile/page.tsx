@@ -11,10 +11,12 @@ import {
   TRANSPORT_OPTIONS,
 } from "../../features/profile/options";
 import { useLang } from "../../lib/useLang";
+import { useTranslation, Trans } from '../../lib/translation';
 import { PhotoEditor } from "../../components/PhotoEditor";
 import { Toast } from "../../components/Toast";
 
 type JwtPayload = {
+
   sub?: string;
   email?: string;
   prenom?: string;
@@ -31,7 +33,7 @@ type Profile = {
     nom: string;
     photoProfil?: string;
     dateNaissance?: string;
-    budget?: number | string; // backend now stores budget as string; UI uses number 1-5
+    budget?: number | string;
     accommodation?: string;
     transport?: string;
     interests?: string[];
@@ -55,147 +57,7 @@ export default function ProfilePage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const [lang, setLang] = useLang();
-  const t = (k: string) => {
-    const dict: Record<string, Record<string, string>> = {
-      en: {
-        loading: "Loading…",
-        preferences: "Preferences",
-        aboutYou: "Tell us about yourself",
-        budgetLevel: "Budget Level",
-        budgetMin: "Budget",
-        budgetMax: "Luxury",
-        budgetQuestion: "What's your travel budget?",
-        accommodation: "Accommodation",
-        accommodationQ: "Where do you prefer to stay?",
-        transport: "Transportation",
-        transportQ: "How do you like to get around?",
-        interests: "Interests",
-        interestsQ: "What interests you most? (Select multiple)",
-        food: "Food Preferences",
-        foodQ: "What cuisines do you enjoy? (Select multiple)",
-        save: "Save Preferences",
-        saving: "Saving…",
-        saved: "Preferences saved",
-        logout: "Logout",
-        gotIt: "Got it",
-        close: "Close",
-        settings: "Settings",
-        language: "Language",
-        changeLanguage: "Change content language",
-        invites: "Pending Invitations",
-        invitesSub: "View trip collaboration invites",
-        upgrade: "Upgrade to Premium",
-        upgradeSub: "Unlock unlimited features",
-        manageSub: "Manage Subscription",
-        manageSubSub: "View usage status and limits",
-        help: "Help & Support",
-        helpSub: "Get assistance and FAQs",
-      },
-      fr: {
-        loading: "Chargement…",
-        preferences: "Préférences",
-        aboutYou: "Parle-nous de toi",
-        budgetLevel: "Niveau de budget",
-        budgetMin: "Budget",
-        budgetMax: "Luxe",
-        budgetQuestion: "Quel est ton budget de voyage ?",
-        accommodation: "Hébergement",
-        accommodationQ: "Où préfères-tu séjourner ?",
-        transport: "Transport",
-        transportQ: "Comment aimes-tu te déplacer ?",
-        interests: "Centres d'intérêt",
-        interestsQ: "Qu'est-ce qui t'intéresse le plus ? (Sélection multiple)",
-        food: "Préférences culinaires",
-        foodQ: "Quelles cuisines apprécies-tu ? (Sélection multiple)",
-        save: "Enregistrer",
-        saving: "Enregistrement…",
-        saved: "Préférences enregistrées",
-        logout: "Se déconnecter",
-        gotIt: "J'ai compris",
-        close: "Fermer",
-        settings: "Réglages",
-        language: "Langue",
-        changeLanguage: "Changer la langue du contenu",
-        invites: "Invitations en attente",
-        invitesSub: "Voir les invitations de collaboration",
-        upgrade: "Passer en Premium",
-        upgradeSub: "Débloquer des fonctionnalités illimitées",
-        manageSub: "Gérer l'abonnement",
-        manageSubSub: "Voir l'utilisation et les limites",
-        help: "Aide & Support",
-        helpSub: "Obtenir de l'aide et FAQ",
-      },
-      es: {
-        loading: "Cargando…",
-        preferences: "Preferencias",
-        aboutYou: "Cuéntanos sobre ti",
-        budgetLevel: "Nivel de presupuesto",
-        budgetMin: "Básico",
-        budgetMax: "Lujo",
-        budgetQuestion: "¿Cuál es tu presupuesto de viaje?",
-        accommodation: "Alojamiento",
-        accommodationQ: "¿Dónde prefieres quedarte?",
-        transport: "Transporte",
-        transportQ: "¿Cómo te gusta moverte?",
-        interests: "Intereses",
-        interestsQ: "¿Qué te interesa más? (Selecciona varios)",
-        food: "Preferencias de comida",
-        foodQ: "¿Qué cocinas disfrutas? (Selecciona varias)",
-        save: "Guardar",
-        saving: "Guardando…",
-        saved: "Preferencias guardadas",
-        logout: "Cerrar sesión",
-        gotIt: "Entendido",
-        close: "Cerrar",
-        settings: "Ajustes",
-        language: "Idioma",
-        changeLanguage: "Cambiar el idioma del contenido",
-        invites: "Invitaciones pendientes",
-        invitesSub: "Ver invitaciones de colaboración",
-        upgrade: "Mejorar a Premium",
-        upgradeSub: "Desbloquear funciones ilimitadas",
-        manageSub: "Gestionar suscripción",
-        manageSubSub: "Ver uso y límites",
-        help: "Ayuda y soporte",
-        helpSub: "Obtener asistencia y preguntas frecuentes",
-      },
-      de: {
-        loading: "Laden…",
-        preferences: "Einstellungen",
-        aboutYou: "Erzähl uns von dir",
-        budgetLevel: "Budgetstufe",
-        budgetMin: "Budget",
-        budgetMax: "Luxus",
-        budgetQuestion: "Wie hoch ist dein Reisebudget?",
-        accommodation: "Unterkunft",
-        accommodationQ: "Wo übernachtest du am liebsten?",
-        transport: "Transport",
-        transportQ: "Wie bewegst du dich am liebsten fort?",
-        interests: "Interessen",
-        interestsQ: "Was interessiert dich am meisten? (Mehrfachauswahl)",
-        food: "Essenspräferenzen",
-        foodQ: "Welche Küchen magst du? (Mehrfachauswahl)",
-        save: "Speichern",
-        saving: "Speichern…",
-        saved: "Einstellungen gespeichert",
-        logout: "Abmelden",
-        gotIt: "Verstanden",
-        close: "Schließen",
-        settings: "Einstellungen",
-        language: "Sprache",
-        changeLanguage: "Inhaltssprache ändern",
-        invites: "Ausstehende Einladungen",
-        invitesSub: "Zusammenarbeitseinladungen ansehen",
-        upgrade: "Upgrade auf Premium",
-        upgradeSub: "Unbegrenzte Funktionen freischalten",
-        manageSub: "Abonnement verwalten",
-        manageSubSub: "Nutzung und Limits anzeigen",
-        help: "Hilfe & Support",
-        helpSub: "Hilfe und FAQ erhalten",
-      },
-    };
-    return dict[lang]?.[k] ?? k;
-  };
+  const { t } = useTranslation();
 
   useEffect(() => setMounted(true), []);
 
