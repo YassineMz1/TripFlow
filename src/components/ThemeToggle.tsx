@@ -78,9 +78,10 @@ export default function ThemeToggle({ size = "md", initialTheme }: { size?: "sm"
       onClick={toggle}
       className={`relative ${dims.btn} rounded-full hover:scale-[1.02] transition-transform`}
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        boxShadow: "0 10px 26px rgba(0,0,0,0.18)",
+  // Lighter grey for increased visibility while keeping contrast
+  background: '#4b5563',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 8px 22px rgba(0,0,0,0.16)',
       }}
     >
       {/* halo */}
@@ -96,10 +97,10 @@ export default function ThemeToggle({ size = "md", initialTheme }: { size?: "sm"
       <span
         aria-hidden
   className="absolute inset-0 grid place-items-center transition-all duration-300"
-        style={{
+          style={{
           opacity: theme === "light" ? 1 : 0,
           transform: theme === "light" ? "rotate(0deg) scale(1)" : "rotate(-30deg) scale(0.85)",
-          color: "var(--foreground)",
+          color: "#ffffff", // force sun icon white
           zIndex: theme === "light" ? 2 : 1,
         }}
       >
@@ -110,7 +111,7 @@ export default function ThemeToggle({ size = "md", initialTheme }: { size?: "sm"
       <span
         aria-hidden
   className="absolute inset-0 grid place-items-center transition-all duration-300"
-        style={{
+          style={{
           opacity: theme === "dark" ? 1 : 0,
           transform: theme === "dark" ? "rotate(0deg) scale(1)" : "rotate(30deg) scale(0.85)",
           color: "var(--foreground)",
@@ -126,8 +127,15 @@ export default function ThemeToggle({ size = "md", initialTheme }: { size?: "sm"
 function SunIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      <defs>
+        <filter id="sunGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#ffffff" floodOpacity="0.12" />
+        </filter>
+      </defs>
+      <g filter="url(#sunGlow)">
+        <circle cx="12" cy="12" r="4" fill="currentColor" />
+      </g>
+      <path stroke="currentColor" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </svg>
   );
 }

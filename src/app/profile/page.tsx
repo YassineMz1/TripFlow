@@ -16,6 +16,7 @@ import { PhotoEditor } from "../../components/PhotoEditor";
 import { Toast } from "../../components/Toast";
 
 type JwtPayload = {
+
   sub?: string;
   email?: string;
   prenom?: string;
@@ -32,7 +33,7 @@ type Profile = {
     nom: string;
     photoProfil?: string;
     dateNaissance?: string;
-    budget?: number | string; // backend now stores budget as string; UI uses number 1-5
+    budget?: number | string;
     accommodation?: string;
     transport?: string;
     interests?: string[];
