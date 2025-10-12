@@ -119,12 +119,34 @@ export default function ProfilePage() {
         setLoading(false);
         return;
       }
+      
+      // Try to use cached data from JWT if backend is unreachable
+      const payload = decodeJwt<JwtPayload>(token);
+      const fallbackData: Profile = {
+        user: { _id: userId, email: (payload as any)?.email || '' },
+        profile: {
+          prenom: payload?.prenom || '',
+          nom: payload?.nom || '',
+          photoProfil: (payload as any)?.photoProfil ?? (payload as any)?.picture,
+          dateNaissance: undefined,
+          budget: 3,
+          accommodation: undefined,
+          transport: undefined,
+          interests: [],
+          foodPreferences: [],
+          role: payload?.role,
+        }
+      };
+      
       try {
         setLoading(true);
         setError(null);
         // This endpoint is public on the backend (no guards), so don't send Authorization
         // to avoid hitting 431 (Request Header Fields Too Large) when tokens become big.
         const res = await fetch(withApiBase(`/user/getProfileByUserId/${userId}`), {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'include',
           cache: "no-store",
         });
         if (!res.ok) {
@@ -134,7 +156,9 @@ export default function ProfilePage() {
         setData(json as Profile);
       } catch (e: any) {
         console.error("Profile load error", e);
-        setError(e?.message || "Failed to load profile");
+        // Use fallback data from JWT so the page is still usable
+        setData(fallbackData);
+        setError("Backend unavailable - showing cached data");
       } finally {
         setLoading(false);
       }
@@ -186,6 +210,8 @@ export default function ProfilePage() {
       setSavedMsg(null);
       const res = await fetch(withApiBase(`/user/updateProfile/${userId}`), {
         method: "PUT",
+        mode: "cors",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -208,6 +234,8 @@ export default function ProfilePage() {
       setSavedMsg(null);
       const res = await fetch(withApiBase(`/user/updateProfile/${userId}`), {
         method: "PUT",
+        mode: "cors",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -269,6 +297,8 @@ export default function ProfilePage() {
           const token = getToken();
           const send = async (payload: string) => fetch(withApiBase(`/user/updateProfile/${data.user._id}`), {
             method: "PUT",
+            mode: "cors",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
@@ -322,6 +352,8 @@ export default function ProfilePage() {
       const token = getToken();
       const res = await fetch(withApiBase(`/user/updateProfile/${data.user._id}`), {
         method: "PUT",
+        mode: "cors",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -351,7 +383,11 @@ export default function ProfilePage() {
     <main className="min-h-dvh w-full px-4 pb-24" style={{ background: "var(--background)", color: "var(--foreground)" }}>
       {error && (
         <div className="mx-auto max-w-[980px] mb-4 rounded-xl px-4 py-3 text-sm" style={{ background: "#fee2e2", color: "#7f1d1d", border: "1px solid #fecaca" }}>
-          {error}. Check your API base ({withApiBase("")}) and CORS settings to allow this origin.
+          <div className="font-semibold mb-1">Unable to connect to backend</div>
+          <div className="text-xs opacity-90">
+            The backend API at <code className="bg-red-900/20 px-1 py-0.5 rounded">{withApiBase("")}</code> is not responding. 
+            Please ensure your backend server is running and CORS is configured to allow this origin.
+          </div>
         </div>
       )}
       {savedMsg && (

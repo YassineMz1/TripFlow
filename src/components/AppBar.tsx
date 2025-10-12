@@ -36,14 +36,7 @@ export default function AppBar({ initialLang, initialTheme }: { initialLang?: La
             <Link href="/home" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navHome")}</Link>
             <Link href="#" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navTrips")}</Link>
             <Link href="#" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navExplore")}</Link>
-            {/* Prominent Translate button next to Explore */}
-            <Link
-              href="/translateVoice"
-              className="ml-1 px-2 py-1 rounded-md text-sm font-medium text-[var(--foreground)] hover:bg-[rgba(46,167,217,0.06)] transition-colors"
-              aria-label="Translate"
-            >
-              Translate
-            </Link>
+            <Link href="/translateVoice" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("Translate")}</Link>
           </nav>
         </div>
 

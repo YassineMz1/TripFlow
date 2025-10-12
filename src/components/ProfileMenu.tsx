@@ -1,10 +1,55 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getToken, decodeJwt, logout } from "../lib/auth";
 import { withApiBase } from "../lib/env";
 
-type JwtPayload = { sub?: string; email?: string; prenom?: string; nom?: string; photoProfil?: string };
+type JwtPayload = { sub?: string; email?: string; prenom?: string; nom?: string; photoProfil?: string; picture?: any };
+
+// Normalize different photo representations into a usable image src string.
+const normalizePhoto = (v: any): string | null => {
+  if (!v && v !== '') return null;
+  try {
+    // If already a full data URL or blob or http(s) URL
+    if (typeof v === 'string') {
+      const s = v.trim();
+        // If it's a Google-hosted avatar leave it unchanged (these URLs often include size hints)
+        if (/googleusercontent\.com|lh3\.googleusercontent\.com|avatars\.googleusercontent\.com/i.test(s)) return s;
+        if (/^data:\w+\/[\w+.-]+;base64,/.test(s)) return s; // already a data URL
+        if (/^(https?:|blob:|data:)/i.test(s)) return s; // valid URL-like
+
+      // If it's raw base64 without data: prefix, try to heuristically detect mime
+      // JPEG often starts with '/9j' when base64-encoded, PNG with 'iVBOR', GIF with 'R0lG'
+      if (/^[A-Za-z0-9+/]+=*$/.test(s) && s.length > 64) {
+        const prefix = s.slice(0, 4);
+        let mime = 'image/jpeg';
+        if (prefix.startsWith('iVB')) mime = 'image/png';
+        else if (prefix.startsWith('R0l')) mime = 'image/gif';
+        else if (prefix.startsWith('UEs')) mime = 'application/zip';
+        return `data:${mime};base64,${s}`;
+      }
+
+      // Otherwise treat as URL string
+      return s;
+    }
+
+    // If it's an object, try common properties
+    if (typeof v === 'object') {
+      if (typeof v.url === 'string') return normalizePhoto(v.url);
+      if (typeof v.src === 'string') return normalizePhoto(v.src);
+      if (typeof v.data === 'string') return normalizePhoto(v.data);
+      if (typeof v.base64 === 'string') return normalizePhoto(v.base64);
+      if (typeof v.picture === 'string') return normalizePhoto(v.picture);
+      // Some providers return nested objects
+      if (v.profile && typeof v.profile === 'object') {
+        return normalizePhoto(v.profile.picture || v.profile.photo || v.profile.image || v.profile.avatar);
+      }
+    }
+  } catch (err) {
+    // ignore and return null
+  }
+  return null;
+};
 
 export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
@@ -12,6 +57,69 @@ export default function ProfileMenu() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const imgErrorAttempts = useRef<Record<string, number>>({});
+
+  const cleanImageSrc = (s: string) => {
+    try {
+      if (!s) return s;
+      // Remove common Google size suffixes (e.g. =s96-c, =s96, ?sz=96)
+      const withoutHash = s.split('#')[0];
+      const urlObj = new URL(withoutHash, window.location.href);
+      // remove sz/size query params
+      urlObj.searchParams.delete('sz');
+      urlObj.searchParams.delete('size');
+      urlObj.searchParams.delete('s');
+      let pathname = urlObj.pathname;
+      // strip trailing '=s96-c' style suffixes
+      pathname = pathname.replace(/=s\d+(-c)?$/i, '');
+      urlObj.pathname = pathname;
+      return urlObj.toString();
+    } catch {
+      return s;
+    }
+  };
+
+  const handleImgError = async (el: HTMLImageElement) => {
+    const src = el?.src || photo || '';
+    if (!src) return;
+    imgErrorAttempts.current[src] = (imgErrorAttempts.current[src] || 0) + 1;
+    // Try cleaning the URL once
+    if (imgErrorAttempts.current[src] === 1) {
+          // For Google avatar URLs, try adding a size parameter if missing
+          if (/googleusercontent\.com|lh3\.googleusercontent\.com|avatars\.googleusercontent\.com/i.test(src)) {
+            try {
+              const u = new URL(src);
+              if (!u.searchParams.has('sz') && !u.search) {
+                u.searchParams.set('sz', '256');
+                const withSize = u.toString();
+                setPhoto(withSize);
+                try { localStorage.setItem('user_profile_photo', withSize); } catch {}
+                return;
+              }
+            } catch {}
+          }
+    }
+
+    if (imgErrorAttempts.current[src] === 2) {
+      try {
+        const res = await fetch(src, { cache: 'force-cache', mode: 'cors' });
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob && blob.type.startsWith('image')) {
+            const obj = URL.createObjectURL(blob);
+            setPhoto(obj);
+                try { if (!obj.startsWith('blob:')) localStorage.setItem('user_profile_photo', obj); } catch {}
+            return;
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    // Give up and clear photo to show initials/avatar fallback
+    setPhoto(null);
+  };
 
   useEffect(() => setMounted(true), []);
 
@@ -44,9 +152,11 @@ export default function ProfileMenu() {
     setEmail((payload as any)?.email || null);
 
     if (!cachedPhoto) {
-      if (payload?.photoProfil) {
-        setPhoto(payload.photoProfil);
-        localStorage.setItem("user_profile_photo", payload.photoProfil);
+      // Accept many fields returned by different providers (Google uses 'picture')
+      const candidate = normalizePhoto((payload as any)?.photoProfil ?? (payload as any)?.picture ?? (payload as any)?.photo ?? (payload as any)?.image ?? (payload as any)?.avatar);
+      if (candidate) {
+        setPhoto(candidate);
+        try { localStorage.setItem("user_profile_photo", candidate); } catch {}
       } else if (payload?.sub) {
         const normalize = (v: any): string | null => {
           if (!v) return null;
@@ -60,12 +170,18 @@ export default function ProfileMenu() {
         const uid = normalize(payload.sub);
         if (!uid) return;
 
-        fetch(withApiBase(`/user/getProfileByUserId/${uid}`), { cache: "no-store" })
+        fetch(withApiBase(`/user/getProfileByUserId/${uid}`), { 
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'include',
+          cache: "no-store" 
+        })
           .then((r) => (r.ok ? r.json() : null))
           .then((j) => {
-            if (j?.profile?.photoProfil) {
-              setPhoto(j.profile.photoProfil);
-              localStorage.setItem("user_profile_photo", j.profile.photoProfil);
+            const candidate2 = normalizePhoto(j?.profile?.photoProfil ?? j?.profile?.picture ?? j?.profile?.photo ?? j?.profile?.image ?? j?.profile?.avatar ?? j?.photoProfil ?? j?.picture);
+            if (candidate2) {
+              setPhoto(candidate2);
+              try { localStorage.setItem("user_profile_photo", candidate2); } catch {}
             }
           })
           .catch(() => {});
@@ -90,7 +206,7 @@ export default function ProfileMenu() {
       >
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="avatar" className="block h-full w-full object-cover" />
+          <img src={photo} alt="avatar" className="block h-full w-full object-cover" onError={(e) => { try { handleImgError(e.currentTarget as HTMLImageElement); } catch { setPhoto(null); } }} />
         ) : (
           <div className="h-full w-full grid place-items-center" style={{ background: "var(--surface)", color: "var(--muted-foreground)" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -113,7 +229,7 @@ export default function ProfileMenu() {
               <div className="h-12 w-12 rounded-lg overflow-hidden bg-[color:var(--surface)] flex-shrink-0 grid place-items-center" style={{ border: "1px solid var(--border)" }}>
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="avatar" className="h-full w-full object-cover" />
+                  <img src={photo} alt="avatar" className="h-full w-full object-cover" onError={(e) => { try { handleImgError(e.currentTarget as HTMLImageElement); } catch { setPhoto(null); } }} />
                 ) : (
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ color: 'var(--muted-foreground)' }}>
                     <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />

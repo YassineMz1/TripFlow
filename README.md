@@ -2,7 +2,24 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+1. **Backend API** - This frontend requires a backend API to be running. 
+   - Default backend URL: `http://localhost:3000`
+   - Configure in `.env.local` (see Configuration section below)
+   - Make sure your backend has CORS enabled for `http://localhost:3001` (Next.js dev port)
+
+2. **Node.js** - Version 18 or higher recommended
+
+### Running the Frontend
+
+First, install dependencies:
+
+```bash
+npm install
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
@@ -14,7 +31,43 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3001](http://localhost:3001) with your browser to see the result.
+(Note: Port 3001 is used if 3000 is taken by the backend)
+
+## Configuration
+
+Create a `.env.local` file in the root directory:
+
+```env
+# Backend API URL - update this to match your backend
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+
+# If backend is on different port:
+# NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
+
+## Troubleshooting
+
+### "Failed to fetch" error on profile page
+
+This means the backend API is not running or not accessible. To fix:
+
+1. **Start your backend server** on the configured port (default: 3000)
+2. **Check CORS settings** - Backend must allow requests from `http://localhost:3001`
+3. **Verify API_BASE_URL** in `.env.local` matches your backend URL
+4. **Check backend endpoints** are responding:
+   - `GET /user/getProfileByUserId/:id`
+   - `PUT /user/updateProfile/:id`
+   - `GET /user/auth/google`
+
+### Backend CORS Configuration Example
+
+Your backend should include CORS headers like:
+```
+Access-Control-Allow-Origin: http://localhost:3001
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
