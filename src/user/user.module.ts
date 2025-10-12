@@ -27,7 +27,7 @@ import { GoogleStrategy } from './jwt-auth-guard/google.strategy';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
+        signOptions: { expiresIn: configService.get('JWT_EXPIRATION') || '7d' },
       }),
       inject: [ConfigService],
     }),

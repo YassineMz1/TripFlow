@@ -9,20 +9,13 @@ async function bootstrap() {
     .map((o) => o.trim())
     .filter(Boolean);
 
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Allow non-browser requests (no Origin) and allowed origins
-      if (!origin || corsOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Not allowed by CORS: ${origin}`), false);
-      }
-    },
-    credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization',
-    exposedHeaders: 'Authorization',
-  });
+ app.enableCors({
+  origin: corsOrigins.length > 0 ? corsOrigins : true, // Allow configured origins or all if none specified
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  allowedHeaders: 'Content-Type, Authorization',
+  exposedHeaders: 'Authorization',
+});
 
   const preferredPort = parseInt(process.env.PORT ?? '3000', 10);
   let portToUse = preferredPort;

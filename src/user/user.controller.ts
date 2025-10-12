@@ -66,15 +66,11 @@ export class UserController {
             photoProfil?: string;
             providerId: string;
         };
-
-        // Upsert user based on email
         const result = await this.userService.upsertGoogleUser(oauthUser);
+        // Keep JWT payload minimal to avoid 431 errors
         const payload = {
             sub: (result.user as any)._id?.toString?.() || (result as any).userId || '',
             email: result.user.email,
-            prenom: result.profile.prenom,
-            nom: result.profile.nom,
-            photoProfil: result.profile.photoProfil,
             role: 'CLIENT',
         };
         const token = this.jwtService.sign(payload);

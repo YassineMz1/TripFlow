@@ -32,14 +32,11 @@ export class LoginService {
             throw new UnauthorizedException('User profile not found');
         }
 
+        // Keep JWT payload minimal to avoid 431 errors
         const payload = {
             sub: user._id,
             email: user.email,
             role: profile.role,
-            prenom: profile.prenom,
-            nom: profile.nom,
-            dateNaissance: profile.dateNaissance,
-            photoProfil: profile.photoProfil,
         };
 
         const token = this.jwtService.sign(payload);
@@ -47,7 +44,15 @@ export class LoginService {
         return {
             message: 'Login successful',
             access_token: token,
-            user: payload,
+            user: {
+                sub: user._id,
+                email: user.email,
+                role: profile.role,
+                prenom: profile.prenom,
+                nom: profile.nom,
+                dateNaissance: profile.dateNaissance,
+                photoProfil: profile.photoProfil,
+            },
             profile: profile
         };
     }
