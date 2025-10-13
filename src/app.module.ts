@@ -4,12 +4,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
+import { LandmarksModule } from './landmarks/landmarks.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRoot('mongodb://127.0.0.1:27017/TripFlow'),
     UserModule,
+    LandmarksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
