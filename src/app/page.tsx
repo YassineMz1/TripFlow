@@ -1,5 +1,5 @@
-import FirstScreen from "./firstscreen";
+import { redirect } from "next/navigation"
 
-export default function Page() {
-  return <FirstScreen />;
+export default function RootPage() {
+  redirect("/home")
 }
