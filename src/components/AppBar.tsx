@@ -1,25 +1,25 @@
-"use client";
-import Link from "next/link";
-import ThemeToggle from "./ThemeToggle";
-import ProfileMenu from "./ProfileMenu";
-import { useLang, type Lang } from "../lib/useLang";
-import { useTranslation } from "../lib/translation";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+"use client"
+import Link from "next/link"
+import ThemeToggle from "./ThemeToggle"
+import ProfileMenu from "./ProfileMenu"
+import { useLang, type Lang } from "../lib/useLang"
+import { useTranslation } from "../lib/translation"
+import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export default function AppBar({ initialLang, initialTheme }: { initialLang?: Lang; initialTheme?: "light" | "dark" }) {
-  const pathname = usePathname();
+  const pathname = usePathname()
   // Always call hooks in a consistent order to satisfy React Rules of Hooks
-  useLang(initialLang);
-  const { t } = useTranslation();
+  useLang(initialLang)
+  const { t } = useTranslation()
 
   // Avoid server/client hydration mismatch when pathname isn't available on the server.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
-  if (!mounted) return null;
-  const isRoot = pathname === "/";
-  if (isRoot) return null;
+  if (!mounted) return null
+  const isRoot = pathname === "/"
+  if (isRoot) return null // Only hide on actual root, not /home
 
   return (
     <header
@@ -29,14 +29,27 @@ export default function AppBar({ initialLang, initialTheme }: { initialLang?: La
       <div className="max-w-7xl mx-auto h-12 px-4 grid grid-cols-[1fr_auto_1fr] items-center no-theme-transition">
         {/* Left: brand + links */}
         <div className="flex items-center gap-6">
-          <Link href="/home" className="text-lg font-extrabold select-none no-theme-transition" style={{ color: 'var(--foreground)' }}>
-            <span>Trip</span><span className="text-[#29D1FF]">Flow</span>
+          <Link
+            href="/home"
+            className="text-lg font-extrabold select-none no-theme-transition"
+            style={{ color: "var(--foreground)" }}
+          >
+            <span>Trip</span>
+            <span className="text-[#29D1FF]">Flow</span>
           </Link>
           <nav className="hidden sm:flex items-center gap-4 text-sm" style={{ color: "var(--foreground)" }}>
-            <Link href="/home" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navHome")}</Link>
-            <Link href="#" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navTrips")}</Link>
-            <Link href="#" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("navExplore")}</Link>
-            <Link href="/translateVoice" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>{t("Translate")}</Link>
+            <Link href="/home" className="hover:opacity-90" style={{ color: "var(--foreground)" }} aria-label="nav-home">
+              {t("navHome") || "Home"}
+            </Link>
+            <Link href="#" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>
+              {t("navTrips") || "My trips"}
+            </Link>
+            <Link href="/explore" className="hover:opacity-90" style={{ color: "var(--foreground)" }}>
+  Explore
+</Link>
+            <Link href="/translateVoice" className="hover:opacity-90" style={{ color: "var(--foreground)" }} aria-label="nav-translate-voice">
+              {t("Translate") || "Translate"}
+            </Link>
           </nav>
         </div>
 
@@ -50,5 +63,5 @@ export default function AppBar({ initialLang, initialTheme }: { initialLang?: La
         </div>
       </div>
     </header>
-  );
+  )
 }
