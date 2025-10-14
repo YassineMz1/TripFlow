@@ -32,7 +32,7 @@ export class LandmarksController {
       }
     }),
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB
+      fileSize: 50 * 1024 * 1024, // 50 MB limit
     },
   }))
   async recognizeFromFile(@UploadedFile() file: Express.Multer.File) {
@@ -41,7 +41,8 @@ export class LandmarksController {
     }
 
     try {
-      const result = await this.landmarksService.detectLandmarkFromFile(file.buffer);
+      // Pass the file path to the service
+      const result = await this.landmarksService.detectLandmarkFromFile(file.path);
       return result;
     } catch (error) {
       return { success: false, error: error.message };

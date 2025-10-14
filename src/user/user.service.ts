@@ -18,7 +18,6 @@ export class UserService {
         }
         let user = await this.userModel.findOne({ email: oauthUser.email });
         if (!user) {
-            // Create a user with a random password
             const randomPwd = Math.random().toString(36).slice(-12);
             const hashedPassword = await bcrypt.hash(randomPwd, 10);
             user = await new this.userModel({ email: oauthUser.email, motDePasse: hashedPassword }).save();
