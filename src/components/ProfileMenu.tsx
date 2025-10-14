@@ -258,21 +258,8 @@ export default function ProfileMenu() {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
-                // Debug logs to help trace logout issues
-                try {
-                  console.log("[ProfileMenu] Logout clicked", {
-                    time: new Date().toISOString(),
-                    activeElement: (document.activeElement as HTMLElement | null)?.outerHTML?.slice?.(0, 200) || String(document.activeElement),
-                    token: getToken?.() ?? null,
-                  });
-                } catch (err) {
-                  console.error("[ProfileMenu] Error logging logout click", err);
-                }
-
-                // Close menu immediately and remove focus so hover/focus styles don't persist
                 setOpen(false);
                 try { (e.currentTarget as HTMLElement).blur(); } catch {}
-                // small fallback to ensure no lingering focus
                 setTimeout(() => { try { (document.activeElement as HTMLElement | null)?.blur(); } catch {} }, 50);
                 void logout();
               }}

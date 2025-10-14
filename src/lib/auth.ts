@@ -22,30 +22,20 @@ export const getToken = (): string | null => {
 };
 
 export const logout = async () => {
-  const token = getToken();
-  // Debug: log token and time
-  try { console.log('[auth.logout] invoked', { time: new Date().toISOString(), token: token ?? null }); } catch {}
-
-  // Perform immediate client-side cleanup and redirect so the UI is responsive
   try {
+    const token = getToken();
+    if (token) {
+      await api.logout(token);
+    }
+  } catch (error) {
+    console.error("Logout failed:", error);
+  } finally {
     if (typeof window !== "undefined") {
       localStorage.removeItem("auth_token");
-      localStorage.removeItem("user_profile_photo"); // Clear photo on logout
+      localStorage.removeItem("user_profile_photo");
       sessionStorage.removeItem("auth_token");
-      // Redirect to home to reflect logged-out state
-      console.log('[auth.logout] client cleanup done, redirecting');
       window.location.href = "/";
     }
-  } catch (err) {
-    console.error('[auth.logout] client cleanup error', err);
-  }
-
-  // Fire-and-forget server logout; don't block the UI on network errors
-  try {
-    console.log('[auth.logout] firing background logout');
-    api.logout(token).then(() => console.log('[auth.logout] background logout success')).catch((error) => console.error("Logout failed (background):", error));
-  } catch (error) {
-    console.error("Logout failed (background):", error);
   }
 };
 
