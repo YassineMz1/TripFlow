@@ -3,6 +3,10 @@ import { useState } from "react"
 import type React from "react"
 
 export default function ExplorePage() {
+  // Prevent scroll restoration from jumping to top
+  if (typeof window !== "undefined") {
+    window.history.scrollRestoration = "manual";
+  }
   const [imageUrl, setImageUrl] = useState("")
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState("")
@@ -114,7 +118,7 @@ export default function ExplorePage() {
   }
 
   return (
-    <main className="min-h-screen pt-20" style={{ background: "var(--background)" }}>
+    <main className="min-h-screen transition-colors duration-300" style={{ background: "var(--background)" }}>
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
@@ -142,6 +146,7 @@ export default function ExplorePage() {
             boxShadow: "0 20px 50px -12px rgba(0, 0, 0, 0.25)"
           }}
         >
+          
           <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <input
               type="url"
@@ -177,6 +182,15 @@ export default function ExplorePage() {
               type="file"
               id="file-upload-explore"
               accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            {/* Camera input for taking photo */}
+            <input
+              type="file"
+              id="camera-upload-explore"
+              accept="image/*"
+              capture="environment"
               onChange={handleFileUpload}
               className="hidden"
             />

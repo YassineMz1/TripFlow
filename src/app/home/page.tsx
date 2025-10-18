@@ -1,3 +1,7 @@
+  // Prevent scroll restoration from jumping to top
+  if (typeof window !== "undefined") {
+    window.history.scrollRestoration = "manual";
+  }
 import HomeClient from "./HomeClient"
 import { cookies } from "next/headers"
 

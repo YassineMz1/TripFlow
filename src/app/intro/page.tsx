@@ -1,4 +1,8 @@
 "use client";
+// Prevent scroll restoration from jumping to top
+if (typeof window !== "undefined") {
+  window.history.scrollRestoration = "manual";
+}
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 

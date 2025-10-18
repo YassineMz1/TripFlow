@@ -43,6 +43,10 @@ type Profile = {
 };
 
 export default function ProfilePage() {
+  // Prevent scroll restoration from jumping to top
+  if (typeof window !== "undefined") {
+    window.history.scrollRestoration = "manual";
+  }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Profile | null>(null);

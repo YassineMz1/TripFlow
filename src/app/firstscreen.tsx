@@ -4,6 +4,7 @@ import { CARDS } from "../features/onboarding/cardsData";
 import OnboardingCard from "../features/onboarding/OnboardingCard";
 import { startGoogleLogin } from "../lib/auth";
 import AuthModal from "../components/AuthModal";
+import ForgotPasswordModal from "../components/ForgotPasswordModal";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -12,13 +13,27 @@ export default function Home() {
   const indexRef = useRef(0);
   const [active, setActive] = useState(0);
   const [authOpen, setAuthOpen] = useState<false | "login" | "signup">(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   // Helper: scroll a given real slide into center using scrollIntoView for robustness
   const scrollToIndex = (index: number, behavior: ScrollBehavior = "smooth") => {
-    const el = carouselRef.current?.querySelector(`[data-slide=\"${index}\"]`) as HTMLElement | null;
+    const el = carouselRef.current?.querySelector(`[data-slide="${index}"]`) as HTMLElement | null;
     if (!el || !carouselRef.current) return;
-    // Use inline: 'center' to center the card in the scroller
-    el.scrollIntoView({ behavior, block: "nearest", inline: "center" } as any);
+    // Prevent scroll restoration from jumping to top
+    if (typeof window !== "undefined") {
+      window.history.scrollRestoration = "manual";
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      el.scrollIntoView({ behavior, block: "nearest", inline: "center" } as any);
+      // Restore scroll position if it jumps
+      setTimeout(() => {
+        if (window.scrollY < scrollY) {
+          window.scrollTo({ top: scrollY, behavior: "auto" });
+        }
+      }, 10);
+    } else {
+      el.scrollIntoView({ behavior, block: "nearest", inline: "center" } as any);
+    }
   };
 
   const TOTAL = CARDS.length;
@@ -26,7 +41,15 @@ export default function Home() {
   // Navigate to a given slide index
   const goToForward = (target: number) => {
     if (target === indexRef.current) return;
+    // Save current scroll position before moving card
+    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
     scrollToIndex(target, "smooth");
+    // Restore scroll position after moving card
+    setTimeout(() => {
+      if (typeof window !== "undefined" && window.scrollY < scrollY) {
+        window.scrollTo({ top: scrollY, behavior: "auto" });
+      }
+    }, 10);
     indexRef.current = target;
     setActive(target);
   };
@@ -45,7 +68,15 @@ export default function Home() {
   useEffect(() => {
     const interval = setInterval(() => {
       const next = (indexRef.current + 1) % TOTAL;
+      // Save current scroll position before auto-scroll
+      const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
       goToForward(next);
+      // Restore scroll position after auto-scroll
+      setTimeout(() => {
+        if (typeof window !== "undefined" && window.scrollY < scrollY) {
+          window.scrollTo({ top: scrollY, behavior: "auto" });
+        }
+      }, 10);
     }, 3500);
     return () => clearInterval(interval);
   }, [TOTAL]);
@@ -251,6 +282,15 @@ export default function Home() {
         open={!!authOpen}
         onClose={() => setAuthOpen(false)}
         onSuccess={() => router.push("/intro?next=/home")}
+        // Add a prop to trigger forgot password modal
+        onForgotPassword={() => {
+          setAuthOpen(false);
+          setForgotOpen(true);
+        }}
+      />
+      <ForgotPasswordModal
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
       />
     </main>
   );

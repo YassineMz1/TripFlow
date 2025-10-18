@@ -5,6 +5,10 @@ import { withApiBase } from "../../lib/env";
 import { useTranslation } from "../../lib/translation";
 
 export default function ForgotPasswordPage() {
+  // Prevent scroll restoration from jumping to top
+  if (typeof window !== "undefined") {
+    window.history.scrollRestoration = "manual";
+  }
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

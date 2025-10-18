@@ -8,9 +8,10 @@ export type AuthModalProps = {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  onForgotPassword?: () => void;
 };
 
-export default function AuthModal({ mode, open, onClose, onSuccess }: AuthModalProps) {
+export default function AuthModal({ mode, open, onClose, onSuccess, onForgotPassword }: AuthModalProps) {
   const [current, setCurrent] = useState<"login" | "signup">(mode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +234,19 @@ export default function AuthModal({ mode, open, onClose, onSuccess }: AuthModalP
               style={{ borderColor: 'rgba(255,255,255,0.06)' }}
               placeholder="••••••••"
             />
+            {current === "login" && (
+              <div className="mt-2 text-right">
+                <button
+                  type="button"
+                  className="text-blue-400 hover:underline text-sm bg-transparent border-none p-0 cursor-pointer"
+                  onClick={() => {
+                    onForgotPassword?.();
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
 
           {error && (

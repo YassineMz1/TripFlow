@@ -5,6 +5,10 @@ import Link from "next/link";
 import { withApiBase } from "../../../lib/env";
 
 export default function ResetPasswordPage() {
+  // Prevent scroll restoration from jumping to top
+  if (typeof window !== "undefined") {
+    window.history.scrollRestoration = "manual";
+  }
   const router = useRouter();
   const params = useParams();
   const token = params?.token as string;

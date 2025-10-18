@@ -6,6 +6,10 @@ import { withApiBase } from "../../lib/env";
 import { translateAndCache } from "../../lib/translate";
 
 export default function TranslateVoicePage() {
+    // Prevent scroll restoration from jumping to top
+    if (typeof window !== "undefined") {
+        window.history.scrollRestoration = "manual";
+    }
     const [listening, setListening] = useState(false);
     const [originalText, setOriginalText] = useState("");
     const [translatedText, setTranslatedText] = useState("");
@@ -13,20 +17,66 @@ export default function TranslateVoicePage() {
     const [targetLang, setTargetLang] = useState("fr");
     const [translating, setTranslating] = useState(false);
     const inputRef = useRef<HTMLTextAreaElement | null>(null);
+    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+    const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+    const [recordingSupported, setRecordingSupported] = useState(false);
 
-    const onToggleListen = () => {
+    // Use MediaRecorder for cross-platform audio capture
+    useEffect(() => {
+        if (typeof window !== "undefined" && navigator.mediaDevices && window.MediaRecorder) {
+            setRecordingSupported(true);
+        }
+    }, []);
+
+    const onToggleListen = async () => {
         if (!listening) {
-            startRecognition();
+            if (!recordingSupported) {
+                alert("Audio recording not supported in this browser.");
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const recorder = new window.MediaRecorder(stream);
+                setMediaRecorder(recorder);
+                setAudioChunks([]);
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) setAudioChunks((prev) => [...prev, e.data]);
+                };
+                recorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Upload audioBlob to backend for speech-to-text
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob);
+                    formData.append('lang', sourceLang);
+                    try {
+                        const resp = await fetch('/api/speech-to-text', {
+                            method: 'POST',
+                            body: formData,
+                        });
+                        const data = await resp.json();
+                        if (resp.ok && data.text) {
+                            setOriginalText(data.text);
+                        } else {
+                            setOriginalText('');
+                            alert('Speech recognition failed.');
+                        }
+                    } catch (err) {
+                        setOriginalText('');
+                        alert('Speech recognition error.');
+                    }
+                };
+                recorder.start();
+                setListening(true);
+            } catch (err) {
+                alert('Could not start audio recording.');
+            }
         } else {
-            stopRecognition();
+            mediaRecorder?.stop();
+            setListening(false);
         }
     };
 
-    // In-browser SpeechRecognition helpers (no backend required)
-    const recognitionRef = useRef<any>(null);
-    const finalTextRef = useRef<string>("");
-    const lastSpeechDetectRef = useRef<number | null>(null);
-    const supportsRecognition = typeof window !== "undefined" && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    // Remove browser SpeechRecognition logic
 
     // shared language map for recognition and TTS
     const LANG_MAP: Record<string, string> = { fr: "fr-FR", en: "en-US", es: "es-ES", de: "de-DE", it: "it-IT", ar: "ar-SA", ja: "ja-JP" };
@@ -138,55 +188,7 @@ export default function TranslateVoicePage() {
         };
     }, []);
 
-    const startRecognition = () => {
-        if (!supportsRecognition) {
-            alert("SpeechRecognition not supported in this browser. Use Chrome/Edge or provide a backend.");
-            return;
-        }
-        const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const rec = new SR();
-        rec.lang = LANG_MAP[sourceLang] || "en-US";
-        rec.interimResults = true;
-        rec.maxAlternatives = 1;
-
-        rec.onresult = (ev: any) => {
-            let interim = "";
-            let finalSeg = "";
-            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-                const r = ev.results[i];
-                if (r.isFinal) finalSeg += r[0].transcript;
-                else interim += r[0].transcript;
-            }
-            if (finalSeg) {
-                // append new final segment once
-                finalTextRef.current = (finalTextRef.current ? finalTextRef.current + " " + finalSeg : finalSeg).trim();
-                // show final (no interim)
-                setOriginalText(finalTextRef.current);
-            } else if (interim) {
-                // show final + interim
-                setOriginalText((finalTextRef.current ? finalTextRef.current + " " + interim : interim).trim());
-            }
-        };
-
-        rec.onerror = (e: any) => {
-            console.error("SpeechRecognition error", e);
-            setListening(false);
-        };
-            rec.onend = () => {
-                setListening(false);
-                // when recognition ends, run language detection automatically if we have text
-                const txt = finalTextRef.current || '';
-                if (txt.trim()) {
-                    // mark that we triggered detection from speech (used to avoid the auto-detect effect doing it again)
-                    lastSpeechDetectRef.current = Date.now();
-                    // fire-and-forget
-                    void detectLanguageFromText(txt);
-                }
-            };
-        recognitionRef.current = rec;
-        rec.start();
-        setListening(true);
-    };
+    // SpeechRecognition logic removed; now handled by backend
 
     // Detect language of the given text (or current originalText) using public service then fallbacks.
     async function detectLanguageFromText(text?: string) {
@@ -306,20 +308,30 @@ export default function TranslateVoicePage() {
         // cancel any ongoing speech
         synth.cancel();
 
+        // Try to reload voices if not loaded
+        let voices = synth.getVoices();
+        if (!voices || voices.length === 0) {
+            // Some browsers need onvoiceschanged event to load voices
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+            };
+            voices = synth.getVoices();
+        }
+        if (!voices || voices.length === 0) {
+            alert("No voices available for speech synthesis. Try reloading the page or using a different browser.");
+            return;
+        }
+
         const utter = new SpeechSynthesisUtterance(translatedText);
-        // map target language to locale where possible
         utter.lang = LANG_MAP[targetLang] || `${targetLang}`;
 
         // try to pick a matching voice
-        const voices = synth.getVoices();
         let match = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith((utter.lang || '').toLowerCase().split('-')[0]));
         if (!match) {
-            // try more relaxed match by language code only
             match = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith((targetLang || '').toLowerCase()));
         }
         if (match) utter.voice = match;
 
-        // small defaults for clarity
         utter.rate = 1;
         utter.pitch = 1;
 
@@ -359,28 +371,14 @@ export default function TranslateVoicePage() {
             return;
         }
 
-        // If we recently triggered detection from speech end, skip the auto-detect to avoid duplicates
-        if (lastSpeechDetectRef.current && Date.now() - lastSpeechDetectRef.current < 2000) {
-            // clear the marker after skipping once
-            lastSpeechDetectRef.current = null;
-        } else {
-            const timer = setTimeout(() => {
-                void detectLanguageFromText(txt);
-            }, 600);
-
-            return () => clearTimeout(timer);
-        }
+        // SpeechRecognition debounce logic removed
+        const timer = setTimeout(() => {
+            void detectLanguageFromText(txt);
+        }, 600);
+        return () => clearTimeout(timer);
     }, [originalText, listening]);
 
-    const stopRecognition = () => {
-        try {
-            recognitionRef.current?.stop();
-        } catch (e) {
-            // ignore
-        }
-        recognitionRef.current = null;
-        setListening(false);
-    };
+    // Removed unused stopRecognition function
 
     // Translate using a public LibreTranslate instance by default
     async function translateText() {
@@ -394,10 +392,7 @@ export default function TranslateVoicePage() {
             // Infer source from recognition language or selected sourceLang
             try {
                 if (originalText && originalText.trim()) {
-                    const recogLang = recognitionRef.current?.lang || '';
-                    const inferredSource = source === 'auto' ? (recogLang ? recogLang.split('-')[0] : 'en') : source;
-                    // use translateTextAPI directly to pass source (translateAndCache currently calls with default source)
-                    const quick = await (await import('../../lib/translate')).translateTextAPI(originalText, target, inferredSource);
+                    const quick = await (await import('../../lib/translate')).translateTextAPI(originalText, target, source);
                     if (quick && quick !== originalText) {
                         setTranslatedText(quick);
                         // cache it as well
@@ -443,10 +438,8 @@ export default function TranslateVoicePage() {
                 // fallthrough to fallback
             }
 
-            // Fallback: MyMemory free API (GET). Use recognition language as source if available.
-            const recogLang = recognitionRef.current?.lang || '';
-            // infer a short source code for MyMemory (if source was auto, try to derive from recognition)
-            const inferredSource = source === 'auto' ? (recogLang ? recogLang.split('-')[0] : 'en') : source;
+            // Fallback: MyMemory free API (GET).
+            const inferredSource = source;
             const memTarget = targetLang;
 
             // if inferred source equals target, just echo original text
@@ -557,7 +550,6 @@ export default function TranslateVoicePage() {
                                         onClick={() => {
                                             setOriginalText("");
                                             setTranslatedText("");
-                                            finalTextRef.current = "";
                                             setDetectedLangName(null);
                                             if (inputRef.current) inputRef.current.value = "";
                                         }}
@@ -652,15 +644,15 @@ export default function TranslateVoicePage() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-[var(--muted-foreground)]">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div className="text-sm text-[var(--muted-foreground)] mb-2 md:mb-0">
                                     <p className="leading-relaxed">TripFlow — speak to translate: click the mic, then Translate or Listen.</p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-3 w-full md:flex-row md:w-auto md:items-center">
                                     <select
                                         value={targetLang}
                                         onChange={(e) => setTargetLang(e.target.value)}
-                                        className="text-sm px-3 py-2 rounded-md border bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100 focus:outline-none"
+                                        className="text-sm px-3 py-2 rounded-md border bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100 focus:outline-none w-full md:w-auto"
                                         aria-label="Target language (bottom)"
                                     >
                                         {languages.map((l) => (
@@ -670,41 +662,68 @@ export default function TranslateVoicePage() {
                                         ))}
                                     </select>
 
-                                    <div className="flex items-center gap-2">
-                                        {/* Translate button removed — translations happen automatically while typing */}
+                                    <button
+                                        onClick={() => {
+                                            if (translatedText) {
+                                                // Try Clipboard API first
+                                                if (navigator.clipboard && window.isSecureContext) {
+                                                    navigator.clipboard.writeText(translatedText).catch(() => {
+                                                        // fallback below
+                                                        const textarea = document.createElement('textarea');
+                                                        textarea.value = translatedText;
+                                                        textarea.style.position = 'fixed';
+                                                        textarea.style.opacity = '0';
+                                                        document.body.appendChild(textarea);
+                                                        textarea.focus();
+                                                        textarea.select();
+                                                        try {
+                                                            document.execCommand('copy');
+                                                        } catch {}
+                                                        document.body.removeChild(textarea);
+                                                    });
+                                                } else {
+                                                    // fallback for insecure context or unsupported clipboard
+                                                    const textarea = document.createElement('textarea');
+                                                    textarea.value = translatedText;
+                                                    textarea.style.position = 'fixed';
+                                                    textarea.style.opacity = '0';
+                                                    document.body.appendChild(textarea);
+                                                    textarea.focus();
+                                                    textarea.select();
+                                                    try {
+                                                        document.execCommand('copy');
+                                                    } catch {}
+                                                    document.body.removeChild(textarea);
+                                                }
+                                            }
+                                        }}
+                                        className="px-3 py-2 rounded-md bg-white text-[#0b1724] border border-[#274158] dark:bg-slate-800 dark:text-slate-100 text-sm hover:shadow-sm w-full md:w-auto"
+                                        title="Copy translation"
+                                    >
+                                        Copy
+                                    </button>
 
-                                        <button
-                                            onClick={() => {
-                                                navigator.clipboard?.writeText(translatedText || "");
-                                            }}
-                                            className="px-3 py-2 rounded-md bg-white text-[#0b1724] border border-[#274158] dark:bg-slate-800 dark:text-slate-100 text-sm hover:shadow-sm"
-                                            title="Copy translation"
-                                        >
-                                            Copy
-                                        </button>
-
-                                        <button
-                                            onClick={() => {
-                                                if (speaking) stopSpeaking();
-                                                else speakTranslation();
-                                            }}
-                                            disabled={!translatedText}
-                                            aria-pressed={speaking}
-                                            className={`p-2 rounded-md border text-sm flex items-center justify-center ${speaking ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100'} hover:shadow-sm`}
-                                            title={speaking ? "Stop" : "Listen"}
-                                        >
-                                            {speaking ? (
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M5 4a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1zm8 0a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1z" clipRule="evenodd" />
-                                                </svg>
-                                            ) : (
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                                                    <path d="M19 8a5 5 0 010 8" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (speaking) stopSpeaking();
+                                            else speakTranslation();
+                                        }}
+                                        disabled={!translatedText}
+                                        aria-pressed={speaking}
+                                        className={`p-2 rounded-md border text-sm flex items-center justify-center w-full md:w-auto ${speaking ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100'} hover:shadow-sm`}
+                                        title={speaking ? "Stop" : "Listen"}
+                                    >
+                                        {speaking ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5 4a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1zm8 0a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1z" clipRule="evenodd" />
+                                            </svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                                                <path d="M19 8a5 5 0 010 8" />
+                                            </svg>
+                                        )}
+                                    </button>
                                 </div>
                             </div>
                         </div>

@@ -53,6 +53,12 @@ const normalizePhoto = (v: any): string | null => {
 
 export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  // Listen for mobile menu open event to close profile menu (register immediately)
+  useEffect(() => {
+    const handler = () => setOpen(false);
+    window.addEventListener("mobile-menu-opened", handler, { passive: true });
+    return () => window.removeEventListener("mobile-menu-opened", handler);
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
@@ -200,7 +206,10 @@ export default function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open profile menu"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          window.dispatchEvent(new Event("profile-menu-opened"));
+          setTimeout(() => setOpen((v) => !v), 0);
+        }}
         className="h-10 w-10 rounded-full overflow-hidden border grid place-items-center transition-shadow focus:outline-none focus:ring-2 focus:ring-offset-2"
         style={{ borderColor: "var(--border)", boxShadow: open ? "0 6px 18px rgba(0,0,0,0.25)" : undefined }}
       >
