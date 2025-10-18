@@ -49,7 +49,7 @@ export class LandmarksService implements OnModuleInit {
           total_models_tested: result.total_models_tested,
           confidence_threshold_applied: result.confidence_threshold_applied
         };
-      } else {
+      } else {  
         return {
           success: false,
           error: result.error || 'No landmark detected',

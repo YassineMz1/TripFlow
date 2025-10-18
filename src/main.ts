@@ -3,13 +3,13 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_BASE_URL || 'http://localhost:3001')
+  const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_BASE_URL)
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
 
  app.enableCors({
-  origin: corsOrigins.length > 0 ? corsOrigins : true, // Allow configured origins or all if none specified
+  origin: corsOrigins.length > 0 ? corsOrigins : true,
   credentials: true,
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   allowedHeaders: 'Content-Type, Authorization',
@@ -19,7 +19,7 @@ async function bootstrap() {
   const preferredPort = parseInt(process.env.PORT ?? '3000', 10);
   let portToUse = preferredPort;
   try {
-    await app.listen(portToUse);
+    await app.listen(portToUse , '0.0.0.0');
   } catch (err: any) {
     if (err && err.code === 'EADDRINUSE') {
       portToUse = preferredPort + 1;
@@ -30,6 +30,5 @@ async function bootstrap() {
       throw err;
     }
   }
-  console.log(`API listening on http://localhost:${portToUse}`);
 }
 bootstrap();

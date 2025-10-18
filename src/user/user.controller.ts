@@ -74,7 +74,7 @@ export class UserController {
             role: 'CLIENT',
         };
         const token = this.jwtService.sign(payload);
-        const frontend = process.env.FRONTEND_BASE_URL || 'http://localhost:3001';
+        const frontend = process.env.FRONTEND_BASE_URL;
         const next = '/home';
         const redirectUrl = `${frontend}/auth/callback?access_token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
         return res.redirect(302, redirectUrl);
@@ -119,9 +119,18 @@ export class UserController {
 
     @UseGuards(JwtAuthGuard)
     @Post('logout')
-    logout(@Req() req: Request) {
+    async logout(@Req() req: Request) {
         const authHeader = req.headers['authorization'];
         const token = authHeader?.split(' ')[1];
-        return this.loginService.logout(token);
+        if (!token) {
+            // Return 401 Unauthorized if token is missing or invalid
+            return { statusCode: 401, message: 'Unauthorized: No token provided' };
+        }
+        try {
+            return await this.loginService.logout(token);
+        } catch (error) {
+            // Return 500 error with message
+            return { statusCode: 500, message: 'Logout failed', error: error?.message || error };
+        }
     }
 }

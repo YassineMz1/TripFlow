@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
 import { LandmarksModule } from './landmarks/landmarks.module';
+import { ItineraryModule } from './itinerary/itinerary.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { LandmarksModule } from './landmarks/landmarks.module';
     MongooseModule.forRoot('mongodb://127.0.0.1:27017/TripFlow'),
     UserModule,
     LandmarksModule,
+    ItineraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
