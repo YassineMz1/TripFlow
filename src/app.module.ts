@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
 import { LandmarksModule } from './landmarks/landmarks.module';
 import { ItineraryModule } from './itinerary/itinerary.module';
+import { BudgetOptimizerModule } from './budget-optimizer/budget-optimizer.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ItineraryModule } from './itinerary/itinerary.module';
     UserModule,
     LandmarksModule,
     ItineraryModule,
+    BudgetOptimizerModule
   ],
   controllers: [AppController],
   providers: [AppService],
