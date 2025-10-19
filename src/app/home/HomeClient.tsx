@@ -3,7 +3,7 @@ import { useMemo } from "react"
 import Link from "next/link"
 import { useLang, type Lang } from "../../lib/useLang"
 
-type Feature = { title: string; subtitle: string; icon: string; gradient: string }
+type Feature = { title: string; subtitle: string; icon: string; gradient: string; link?: string }
 const FEATURES: Feature[] = [
   {
     title: "Smart Itineraries",
@@ -23,7 +23,7 @@ const FEATURES: Feature[] = [
     icon: "🗺️",
     gradient: "from-[#2FB46B] to-[#77DD77]",
   },
-  { title: "Budget Control", subtitle: "Keep costs transparent", icon: "💳", gradient: "from-[#E86BB0] to-[#7BC9FF]" },
+  { title: "Budget Control", subtitle: "Keep costs transparent", icon: "💳", gradient: "from-[#E86BB0] to-[#7BC9FF]", link: "/budget-control" },
 ]
 
 export default function HomeClient({ initialLang }: { initialLang: Lang }) {
@@ -167,21 +167,26 @@ export default function HomeClient({ initialLang }: { initialLang: Lang }) {
       <section className="max-w-7xl mx-auto px-4 py-12">
         <h2 className="text-2xl sm:text-3xl font-extrabold">{t("featuresTitle")}</h2>
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {FEATURES.map((f, i) => (
-            <div
-              key={i}
-              className="relative rounded-3xl p-5 text-white"
-              style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.20)" }}
-            >
-              <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${f.gradient}`} />
-              <div className="absolute inset-px rounded-[22px] ring-1 ring-white/30" />
-              <div className="relative">
-                <div className="text-3xl">{f.icon}</div>
-                <div className="mt-4 text-lg font-bold">{f.title}</div>
-                <div className="text-white/90 text-sm">{f.subtitle}</div>
+          {FEATURES.map((f, i) => {
+            const CardContent = (
+              <div className="relative rounded-3xl p-5 text-white" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.20)" }}>
+                <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${f.gradient}`} />
+                <div className="absolute inset-px rounded-[22px] ring-1 ring-white/30" />
+                <div className="relative">
+                  <div className="text-3xl">{f.icon}</div>
+                  <div className="mt-4 text-lg font-bold">{f.title}</div>
+                  <div className="text-white/90 text-sm">{f.subtitle}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+            return f.link ? (
+              <Link href={f.link} key={i} className="hover:scale-[1.03] transition-transform focus:outline-none">
+                {CardContent}
+              </Link>
+            ) : (
+              <div key={i}>{CardContent}</div>
+            );
+          })}
         </div>
       </section>
 
