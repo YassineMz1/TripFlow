@@ -103,13 +103,63 @@ export default function ExplorePage() {
         return
       }
 
-      const data = await res.json()
+            const data = await res.json()
+
+      // Handle common upstream errors explicitly
       if (!res.ok || data?.success === false) {
-        const errorMsg = data?.error || data?.message || "Analysis failed."
-        setError(errorMsg)
-      } else {
-        setResult(data)
+        // Prefer explicit upstream/timeout messages if available
+        const upstreamMsg = data?.error || data?.message || data?.upstreamBody || data?.detail
+        // If the backend specifically told us the endpoint isn't implemented, surface that to the user
+        if ((data?.upstreamBody && /not implemented/i.test(data.upstreamBody)) ||
+            /not implemented/i.test(upstreamMsg)) {
+          setError("File upload not implemented yet")
+        } else if (/timeout|Upstream timeout/i.test(upstreamMsg || "")) {
+          setError("Upstream timeout")
+        } else {
+          setError(upstreamMsg || "Analysis failed.")
+        }
+        return
       }
+
+      // Normalize the backend result so the UI always has a label to show
+      // Backend shapes supported:
+      // - { display_name, confidence, raw }
+      // - { best_prediction: { landmark_name, confidence }, ... }
+      // - { landmarks: [{ name, confidence }], ... }
+      // - { predictions: [{ landmark_name, confidence }], ... }
+      const raw = data.raw ?? data
+      const displayName =
+        data.display_name ||
+        raw?.best_prediction?.landmark_name ||
+        raw?.best_prediction?.landmarkName ||
+        (Array.isArray(raw?.landmarks) && (raw.landmarks[0]?.name || raw.landmarks[0]?.landmark_name)) ||
+        (Array.isArray(raw?.predictions) && (raw.predictions[0]?.landmark_name || raw.predictions[0]?.name)) ||
+        null
+
+      const confidence =
+        data.confidence ??
+        raw?.best_prediction?.confidence ??
+        raw?.landmarks?.[0]?.confidence ??
+        raw?.predictions?.[0]?.confidence ??
+        null
+
+      // Try to surface any place metadata if returned by backend
+      const place = raw?.place_record ?? raw?.best_prediction?.place_record ?? null
+
+      // Map into the `result` shape your component expects
+      const mapped = {
+        landmark: {
+          name: displayName ?? "Unknown Location",
+          confidence: typeof confidence === "number" ? Number(confidence) : null,
+          city: place?.city ?? null,
+          country: place?.country ?? null,
+          region: place?.region ?? null,
+          id: raw?.class_id ?? raw?.best_prediction?.class_id ?? raw?.predictions?.[0]?.class_id ?? null,
+        },
+        raw,
+      }
+
+      setResult(mapped)
     } catch (e: any) {
       setError(e?.message || "Unexpected error.")
     } finally {
@@ -208,7 +258,7 @@ export default function ExplorePage() {
                 Click to upload or drag & drop
               </div>
               <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                JPG, PNG, WebP up to 50MB
+                JPG, PNG, WebP up to 10MB
               </div>
             </label>
           </div>

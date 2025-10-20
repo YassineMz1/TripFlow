@@ -10,18 +10,21 @@ const FEATURES: Feature[] = [
     subtitle: "AI-crafted plans in minutes",
     icon: "🧭",
     gradient: "from-[#3A67FF] to-[#2CC7A5]",
+    link: "/itineraries",
   },
   {
-    title: "Live Collaboration",
+    title: "Hotel Booking",
     subtitle: "Plan trips together in real-time",
     icon: "🤝",
     gradient: "from-[#3F7BFA] to-[#72D5FF]",
+    link: "/hotels",
   },
   {
-    title: "Map + Timeline",
+    title: "Exploring Monuments",
     subtitle: "Visualize routes and schedules",
     icon: "🗺️",
     gradient: "from-[#2FB46B] to-[#77DD77]",
+    link: "/explore",
   },
   { title: "Budget Control", subtitle: "Keep costs transparent", icon: "💳", gradient: "from-[#E86BB0] to-[#7BC9FF]", link: "/budget-control" },
 ]

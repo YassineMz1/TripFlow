@@ -52,44 +52,16 @@ export default function Intro() {
 
       </div>
 
-      {/* Plane animation (contrail + plane) */}
-      <div aria-hidden className="pointer-events-none absolute left-0 top-14 w-full h-12 -z-20">
-        <svg className="plane" width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* contrail */}
-          <path className="contrail" d="M10 34 C60 26, 120 18, 180 10" stroke="rgba(255,255,255,0.32)" strokeWidth="3" strokeLinecap="round" fill="none" />
-
-          {/* plane body */}
-          <g transform="translate(0,0)">
-            <path d="M0 30 L28 24 L60 16 L80 14 L76 22 L116 30 L76 38 L80 46 L60 44 L28 36 Z" fill="#FFFFFF" opacity="0.98" />
-            <path d="M64 18 L84 14 L92 18 L76 22 Z" fill="#E6F6FF" opacity="0.9" />
-            <path d="M20 30 L36 28 L36 32 Z" fill="#DDEFFA" opacity="0.9" />
-            <circle cx="52" cy="30" r="1.8" fill="#C6E9FF" />
-          </g>
-        </svg>
-      </div>
+      {/* Plane animation removed for a quieter intro */}
 
       <style jsx>{`
         @keyframes pulseRing { from { transform: scale(0.86); opacity: 0.9 } 60% { opacity: 0.25 } to { transform: scale(1.15); opacity: 0 } }
         @keyframes fadeUp { 0% { opacity: 0; transform: translateY(8px) } 100% { opacity: 1; transform: translateY(0) } }
         @keyframes blink { 0%, 20% { opacity: 0.15 } 50% { opacity: 1 } 100% { opacity: 0.15 } }
 
-        .plane { position: absolute; left: -28%; top: 0; opacity: 0.98; filter: drop-shadow(0 10px 30px rgba(0,0,0,0.45)); animation: flyRight 3.2s cubic-bezier(.22,.9,.3,1) forwards; }
-        .contrail { stroke-dasharray: 200; stroke-dashoffset: 200; opacity: 0.9; animation: trail 3.2s linear forwards; }
-
-        @keyframes flyRight {
-          0% { transform: translateX(-30vw) translateY(-6px) rotate(-6deg) scale(0.96); opacity: 0 }
-          8% { opacity: 1 }
-          55% { transform: translateX(36vw) translateY(-4px) rotate(-2deg) scale(1.02) }
-          85% { transform: translateX(86vw) translateY(-6px) rotate(4deg) scale(1) }
-          100% { transform: translateX(140vw) translateY(-8px) rotate(6deg) scale(1); opacity: 0.98 }
-        }
-
-        @keyframes trail { to { stroke-dashoffset: 0; opacity: 0.36 } }
-
         /* Respect reduced motion */
         @media (prefers-reduced-motion: reduce) {
-          .plane { animation: none; transform: translateX(40vw) !important; opacity: 1 !important; }
-          .contrail { animation: none; stroke-dashoffset: 0; opacity: 0.32 }
+          /* No plane animation present */
         }
       `}</style>
     </div>

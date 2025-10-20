@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -44,6 +44,175 @@ export default function NewItineraryPage() {
   const [isPublic, setIsPublic] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+
+  // Prefill from sessionStorage if present (when user clicks View -> New)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const raw = sessionStorage.getItem('prefillItinerary');
+        if (!raw) return;
+        const it = JSON.parse(raw);
+        if (!it) return;
+
+        // Debug log the incoming prefill so user can paste it if something doesn't match
+        // eslint-disable-next-line no-console
+        console.log('prefillItinerary parsed:', it);
+
+        // Helper: robust location extractor
+        const extractLocation = (obj: any) => {
+          if (!obj) return null;
+          // Case: already in form shape { type: 'Point', coordinates: [lng, lat], name?, address? }
+          if (obj.type === 'Point' && Array.isArray(obj.coordinates) && obj.coordinates.length >= 2) {
+            return { type: 'Point', coordinates: obj.coordinates, name: obj.name || obj.address || '' , address: obj.address || obj.name || '' };
+          }
+          // Case: nested under location: { location: { type: 'Point', coordinates: [...] }, name }
+          if (obj.location && obj.location.type === 'Point' && Array.isArray(obj.location.coordinates)) {
+            return { type: 'Point', coordinates: obj.location.coordinates, name: obj.name || obj.location.name || obj.address || '' , address: obj.location.address || obj.address || obj.name || '' };
+          }
+          // Case: origin.location.coordinates (legacy): { origin: { location: { coordinates: [lng,lat] } } }
+          if (obj.coordinates && Array.isArray(obj.coordinates) && typeof obj.coordinates[0] === 'number') {
+            return { type: 'Point', coordinates: obj.coordinates, name: obj.name || '', address: obj.address || '' };
+          }
+          // Case: lat/lng properties
+          const lat = obj.lat ?? obj.latitude ?? obj.latit ?? null;
+          const lng = obj.lng ?? obj.lon ?? obj.longitude ?? obj.long ?? null;
+          if (typeof lat === 'number' && typeof lng === 'number') {
+            return { type: 'Point', coordinates: [lng, lat], name: obj.name || '', address: obj.address || '' };
+          }
+          // Not found
+          return null;
+        };
+
+        // Title/description/dates
+        setTitle(it.title || it.name || '');
+        setDescription(it.description || it.summary || '');
+        setStartDate(it.startDate ? String(it.startDate).split('T')[0] : (it.start?.split ? String(it.start).split('T')[0] : ''));
+        setEndDate(it.endDate ? String(it.endDate).split('T')[0] : (it.end?.split ? String(it.end).split('T')[0] : ''));
+
+        // Origin/destination
+        const o = extractLocation(it.origin || it.startLocation || it.from || it.start_point || it.origin_location);
+        const d = extractLocation(it.destination || it.endLocation || it.to || it.end_point || it.destination_location);
+        if (o) setOrigin(o as any);
+        if (d) setDestination(d as any);
+
+        // Waypoints normalization
+        const wps: any[] = [];
+        if (Array.isArray(it.waypoints) && it.waypoints.length > 0) {
+          for (let i = 0; i < it.waypoints.length; i++) {
+            const wp = it.waypoints[i];
+            const loc = extractLocation(wp.location || wp || wp.point || wp.loc || wp.location?.coordinates ? wp.location : wp);
+            if (loc) {
+              wps.push({ name: wp.name || wp.title || `Waypoint ${i + 1}`, location: loc, order: typeof wp.order === 'number' ? wp.order : i });
+            }
+          }
+        }
+        // Some backends store stops under `stops` or `stages`
+        if (wps.length === 0 && Array.isArray(it.stops)) {
+          for (let i = 0; i < it.stops.length; i++) {
+            const s = it.stops[i];
+            const loc = extractLocation(s.location || s);
+            if (loc) wps.push({ name: s.name || `Waypoint ${i + 1}`, location: loc, order: typeof s.order === 'number' ? s.order : i });
+          }
+        }
+        if (wps.length > 0) setWaypoints(wps as any);
+
+        // Transport mode / public / tags
+        setTransportMode(it.transportMode || it.mode || 'driving');
+        setIsPublic(Boolean(it.isPublic || it.public));
+        setTags(Array.isArray(it.tags) ? it.tags : (Array.isArray(it.categories) ? it.categories : []));
+
+        // remove after reading
+        sessionStorage.removeItem('prefillItinerary');
+      }
+    } catch (e) {
+      console.error('Failed to prefill itinerary:', e);
+    }
+  }, []);
+
+  // Try to detect route geometry from a few common formats and set it for the MapView
+  useEffect(() => {
+    try {
+      // If route already set or no origin/destination, skip
+      if (route || (!origin && !destination)) return;
+
+      // If the prefill object included a route in window (rare), try to read it
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const raw = sessionStorage.getItem('prefillItineraryRoute');
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.type === 'LineString' && Array.isArray(parsed.coordinates)) {
+              setRoute(parsed);
+              sessionStorage.removeItem('prefillItineraryRoute');
+              return;
+            }
+          } catch {}
+        }
+      }
+
+      // Otherwise, some backends put the route inside origin/destination objects or waypoints
+      // If any of the objects contains a `geometry` or `route` property that is a LineString, use it
+      const candidates: any[] = [];
+      if (origin && (origin as any).geometry) candidates.push((origin as any).geometry);
+      if (destination && (destination as any).geometry) candidates.push((destination as any).geometry);
+      for (const wp of waypoints) {
+        if ((wp as any).geometry) candidates.push((wp as any).geometry);
+        if ((wp as any).route) candidates.push((wp as any).route);
+      }
+
+      // Also try to sniff at tags like polyline strings on window.__prefill (fallback)
+      // decode polyline if found (Google/OSRM style)
+      const tryDecodePolyline = (polyline: string) => {
+        try {
+          // Small polyline decoder (handles Google encoded polyline)
+          const coords: number[][] = [];
+          let index = 0, lat = 0, lng = 0;
+          while (index < polyline.length) {
+            let b, shift = 0, result = 0;
+            do {
+              b = polyline.charCodeAt(index++) - 63;
+              result |= (b & 0x1f) << shift;
+              shift += 5;
+            } while (b >= 0x20);
+            const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+              b = polyline.charCodeAt(index++) - 63;
+              result |= (b & 0x1f) << shift;
+              shift += 5;
+            } while (b >= 0x20);
+            const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            coords.push([lng / 1e5, lat / 1e5]);
+          }
+          return { type: 'LineString', coordinates: coords };
+        } catch (e) {
+          return null;
+        }
+      };
+
+      for (const c of candidates) {
+        if (!c) continue;
+        if (c.type === 'LineString' && Array.isArray(c.coordinates)) {
+          setRoute(c);
+          return;
+        }
+        if (typeof c === 'string' && c.length > 20) {
+          const decoded = tryDecodePolyline(c);
+          if (decoded) {
+            setRoute(decoded);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [origin, destination, waypoints]);
 
   // Route calculation
   const [route, setRoute] = useState<any>(null);
@@ -163,8 +332,9 @@ export default function NewItineraryPage() {
       if (origin) payload.origin = origin;
       if (destination) payload.destination = destination;
 
-      const itinerary = await itineraryApi.create(payload);
-      router.push(`/itineraries/${itinerary._id}`);
+  const itinerary = await itineraryApi.create(payload);
+  // After creating, navigate to the itineraries list
+  router.push(`/itineraries`);
     } catch (err: any) {
       // Log full error object for debugging
       console.error("Directions API error:", err);

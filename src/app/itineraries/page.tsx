@@ -67,6 +67,38 @@ export default function ItinerariesPage() {
     }
   };
 
+  const handleViewInNew = (itinerary: Itinerary) => {
+    try {
+      // Build a compact, predictable prefill object to avoid shape mismatches
+      const compactPrefill: any = {
+        title: itinerary.title,
+        description: itinerary.description,
+        startDate: (itinerary as any).startDate || (itinerary as any).start || undefined,
+        endDate: (itinerary as any).endDate || (itinerary as any).end || undefined,
+        origin: (itinerary as any).origin || (itinerary as any).startLocation || undefined,
+        destination: (itinerary as any).destination || (itinerary as any).endLocation || undefined,
+        waypoints: (itinerary as any).waypoints || (itinerary as any).stops || undefined,
+        // route may be stored under different keys depending on backend
+        route: (itinerary as any).route || (itinerary as any).geometry || (itinerary as any).polyline || undefined,
+        transportMode: itinerary.transportMode,
+        isPublic: itinerary.isPublic,
+        tags: itinerary.tags,
+      };
+
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.setItem('prefillItinerary', JSON.stringify(compactPrefill));
+        // Helpful debug log so you can copy-paste the exact stored value from browser console
+        // (will appear in the console where the user clicked View)
+        // eslint-disable-next-line no-console
+        console.log('prefillItinerary stored:', compactPrefill);
+      }
+      router.push('/itineraries/new');
+    } catch (e) {
+      console.error('Failed to navigate with prefill:', e);
+      router.push('/itineraries/new');
+    }
+  };
+
   const getTransportIcon = (mode: string) => {
     switch (mode) {
       case "driving":
@@ -219,13 +251,13 @@ export default function ItinerariesPage() {
 
                 {/* Card Footer */}
                 <div className="px-6 pb-6 flex items-center gap-2">
-                  <Link
-                    href={`/itineraries/${itinerary._id}`}
+                  <button
+                    onClick={() => handleViewInNew(itinerary)}
                     className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                   >
                     <Eye className="w-4 h-4" />
                     View
-                  </Link>
+                  </button>
                   <button
                     onClick={() => handleDuplicate(itinerary._id)}
                     className="p-2 rounded-lg hover:opacity-80 transition-colors"

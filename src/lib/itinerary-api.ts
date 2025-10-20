@@ -40,8 +40,8 @@ export interface CreateItineraryDto {
   description?: string;
   startDate: string;
   endDate: string;
-  origin: Location;
-  destination: Location;
+  origin: Location | Waypoint;
+  destination: Location | Waypoint;
   waypoints?: Waypoint[];
   transportMode?: "driving" | "walking" | "cycling";
   isPublic?: boolean;
@@ -89,21 +89,58 @@ async function authenticatedRequest<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    // Try to parse the error as JSON to get more details
+    // Try to parse the error as JSON to get a structured message
     try {
       const errorData = JSON.parse(text);
-      const errorMessage = errorData.message || errorData.error || text;
-      throw new Error(errorMessage);
-  } catch (err) {
-    // Log full error response for debugging
-    console.error('Directions API error:', {
-      path,
-      init,
-      status: res?.status,
-      response: text,
-      error: err
-    });
-    throw new Error(text || `Request failed ${res?.status}`);
+      const errorMessage = errorData?.message || errorData?.error || text;
+      // Log a compact, safe debug object (avoid circular/large init)
+      const safeStringify = (obj: any) => {
+        try {
+          const seen = new Set();
+          return JSON.stringify(obj, (k, v) => {
+            if (typeof v === 'object' && v !== null) {
+              if (seen.has(v)) return '[Circular]';
+              seen.add(v);
+            }
+            if (typeof v === 'function') return `[Function ${v.name || 'anonymous'}]`;
+            return v;
+          }, 2);
+        } catch (_) {
+          try { return String(obj); } catch { return '[unserializable]'; }
+        }
+      };
+
+      console.error(`Directions API error: ${safeStringify({ path, status: res.status, responseSnippet: (text || '').slice(0,200), errorData })}`);
+      throw new Error(errorMessage || `Request failed ${res.status}`);
+    } catch (parseErr) {
+      // If parsing failed, log a safe debug object with limited init info
+      const safeInit: any = {
+        method: init?.method,
+      };
+      if (typeof init?.body === 'string') {
+        safeInit.bodySnippet = init.body.slice(0, 200);
+        safeInit.bodyLength = init.body.length;
+      }
+
+      const safeStringify2 = (obj: any) => {
+        try {
+          const seen = new Set();
+          return JSON.stringify(obj, (k, v) => {
+            if (typeof v === 'object' && v !== null) {
+              if (seen.has(v)) return '[Circular]';
+              seen.add(v);
+            }
+            if (typeof v === 'function') return `[Function ${v.name || 'anonymous'}]`;
+            return v;
+          }, 2);
+        } catch (_) {
+          try { return String(obj); } catch { return '[unserializable]'; }
+        }
+      };
+
+      console.error(`Directions API error (non-JSON): ${safeStringify2({ path, status: res.status, responseSnippet: (text || '').slice(0,200), init: safeInit, parseError: (parseErr as any)?.message || String(parseErr) })}`);
+
+      throw new Error(text || `Request failed ${res.status}`);
     }
   }
 
@@ -115,18 +152,81 @@ export const itineraryApi = {
   // Créer un nouvel itinéraire (auth or public)
   create: (data: CreateItineraryDto) => {
     const token = localStorage.getItem("access_token");
+
+    // Backend expects Waypoint-like objects for origin/destination/waypoints
+    const toBackendWaypoint = (item: Location | Waypoint, fallbackName = "") => {
+      // If already looks like a Waypoint (has name and location object with lat/lng), normalize it
+      const maybeWaypoint = item as Waypoint & { location?: any };
+
+      let name = (maybeWaypoint && maybeWaypoint.name) || fallbackName || "";
+      let address = (maybeWaypoint && (maybeWaypoint as any).address) || "";
+      let placeId = (maybeWaypoint && (maybeWaypoint as any).placeId) || undefined;
+      let stopDuration = (maybeWaypoint && (maybeWaypoint as any).stopDuration) || (maybeWaypoint && maybeWaypoint.duration) || undefined;
+      let notes = (maybeWaypoint && maybeWaypoint.notes) || undefined;
+
+      // location: can be GeoJSON Point { type: 'Point', coordinates: [lng, lat] }
+      let location: { lat: number; lng: number } | undefined;
+      if (maybeWaypoint && (maybeWaypoint as any).location) {
+        const loc = (maybeWaypoint as any).location;
+        if (Array.isArray(loc.coordinates)) {
+          // GeoJSON
+          location = { lat: loc.coordinates[1], lng: loc.coordinates[0] };
+        } else if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+          location = { lat: loc.lat, lng: loc.lng };
+        }
+      } else {
+        // Input might be a raw Location (GeoJSON)
+        const loc = item as Location;
+        if (loc && Array.isArray((loc as any).coordinates)) {
+          location = { lat: loc.coordinates[1], lng: loc.coordinates[0] };
+        }
+      }
+
+      // Ensure at least a location exists; the backend may attempt geocoding if missing, but prefer to send coordinates when available
+      return {
+        name,
+        address,
+        location,
+        placeId,
+        stopDuration,
+        notes,
+      };
+    };
+
+    const payload: any = {
+      title: data.title,
+      description: data.description,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      transportMode: data.transportMode,
+      isPublic: data.isPublic,
+      tags: data.tags,
+      origin: toBackendWaypoint(data.origin, 'Origin'),
+      destination: toBackendWaypoint(data.destination, 'Destination'),
+      waypoints: data.waypoints ? data.waypoints.map((w) => toBackendWaypoint(w, w.name || 'Waypoint')) : undefined,
+    };
+
+    // Debug: log whether token is present
+    // eslint-disable-next-line no-console
+    console.debug('itineraryApi.create — token present:', !!token, 'isPublic:', !!payload.isPublic);
+
+    // If the client is not authenticated and tries to create a private itinerary, block it
+    if (!token && !payload.isPublic) {
+      throw new Error('Not authenticated: cannot create a private itinerary. Please log in to save private itineraries.');
+    }
+
     if (token) {
       return authenticatedRequest<Itinerary>("/itinerary", {
         method: "POST",
-        body: JSON.stringify(data),
-      });
-    } else {
-      // Fallback: create public itinerary (must exist in backend)
-      return authenticatedRequest<Itinerary>("/itinerary/public/create", {
-        method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
     }
+
+    // No token, but isPublic === true -> allow public create
+    return authenticatedRequest<Itinerary>("/itinerary/public/create", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   // Récupérer tous les itinéraires de l'utilisateur ou publics si non authentifié
@@ -141,18 +241,42 @@ export const itineraryApi = {
 
   // Récupérer un itinéraire par ID
   getById: (id: string) =>
-    authenticatedRequest<Itinerary>(`/itinerary/${id}`),
+    // Backend controller exposes GET /itinerary/findone/:id
+    authenticatedRequest<Itinerary>(`/itinerary/findone/${id}`),
 
   // Mettre à jour un itinéraire
   update: (id: string, data: UpdateItineraryDto) =>
-    authenticatedRequest<Itinerary>(`/itinerary/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
+    // Backend controller expects PUT /itinerary/update/:id
+    authenticatedRequest<Itinerary>(`/itinerary/update/${id}`, {
+      method: "PUT",
+      // Transform update payload similarly to create: convert any Location Points to backend waypoint shape
+      body: JSON.stringify((() => {
+        const toBackendWaypoint = (item: any) => {
+          if (!item) return item;
+          if (item.location && typeof item.location.lat === 'number' && typeof item.location.lng === 'number') {
+            return item;
+          }
+          if (item.location && Array.isArray(item.location.coordinates)) {
+            return { ...item, location: { lat: item.location.coordinates[1], lng: item.location.coordinates[0] } };
+          }
+          if (item && Array.isArray(item.coordinates)) {
+            return { name: item.name || '', address: '', location: { lat: item.coordinates[1], lng: item.coordinates[0] } };
+          }
+          return item;
+        };
+
+        const out: any = { ...data };
+        if ((data as any).origin) out.origin = toBackendWaypoint((data as any).origin);
+        if ((data as any).destination) out.destination = toBackendWaypoint((data as any).destination);
+        if ((data as any).waypoints) out.waypoints = (data as any).waypoints.map((w: any) => toBackendWaypoint(w));
+        return out;
+      })()),
     }),
 
   // Supprimer un itinéraire
   delete: (id: string) =>
-    authenticatedRequest<{ message: string }>(`/itinerary/${id}`, {
+    // Backend controller exposes DELETE /itinerary/delete/:id
+    authenticatedRequest<{ message: string }>(`/itinerary/delete/${id}`, {
       method: "DELETE",
     }),
 

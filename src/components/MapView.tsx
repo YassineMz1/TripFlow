@@ -1,13 +1,10 @@
 
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, useMap, Tooltip } from "react-leaflet";
 import { useMapEvent } from "react-leaflet";
-// @ts-ignore
-import type { Map as LeafletMap } from "leaflet";
-
+import L from 'leaflet';
 import "../lib/fixLeafletIcons";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Navigation } from "lucide-react";
 
 function MapClickHandler({ onMapClick }: { onMapClick: (lng: number, lat: number) => void }) {
   useMapEvent("click", (event) => {
@@ -51,6 +48,19 @@ export default function MapView({
 
   const mapRef = useRef(null);
 
+  // helpers to create colored div icons
+  const createCircleIcon = (bg: string, fg = '#fff', size = 36, inner = '') => {
+    const html = `
+      <div style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${fg};font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,0.25);">
+        ${inner}
+      </div>
+    `;
+    return L.divIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size/2, size], popupAnchor: [0, -size] });
+  };
+
+  const originIcon = createCircleIcon('#10b981', '#fff', 40, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zM12 11.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/></svg>');
+  const destinationIcon = createCircleIcon('#ef4444', '#fff', 40, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zM12 11.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/></svg>');
+
   // Ajuster la vue pour inclure tous les points
 
   // Helper to fit bounds on map
@@ -72,10 +82,21 @@ export default function MapView({
     }
   };
 
+  // helper to validate coordinate arrays
+  const isValidCoord = (c: any): c is [number, number] => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number';
+
+  // compute safe center: prefer origin, then destination, then default
+  const center: [number, number] = (() => {
+    if (origin && isValidCoord(origin.coordinates)) return [origin.coordinates[1], origin.coordinates[0]];
+    if (destination && isValidCoord(destination.coordinates)) return [destination.coordinates[1], destination.coordinates[0]];
+    // fallback to Paris
+    return [48.8566, 2.3522];
+  })();
+
   return (
     <div style={{ height, width: "100%", position: "relative" }}>
       <MapContainer
-        center={origin ? [origin.coordinates[1], origin.coordinates[0]] : [48.8566, 2.3522]}
+        center={center}
         zoom={12}
         style={{ width: "100%", height: "100%" }}
         whenReady={() => {}}
@@ -88,9 +109,9 @@ export default function MapView({
         {/* Fit bounds to all points */}
         <FitBounds
           points={[
-            ...(origin ? [origin.coordinates] : []),
-            ...(destination ? [destination.coordinates] : []),
-            ...waypoints.map((wp) => wp.location.coordinates),
+            ...(origin && isValidCoord(origin.coordinates) ? [origin.coordinates] : []),
+            ...(destination && isValidCoord(destination.coordinates) ? [destination.coordinates] : []),
+            ...waypoints.map((wp) => wp.location && isValidCoord(wp.location.coordinates) ? wp.location.coordinates : null).filter(Boolean) as [number, number][],
           ]}
         />
         {/* Map click handler using useMapEvent */}
@@ -104,38 +125,33 @@ export default function MapView({
           />
         )}
         {/* Origin Marker */}
-        {origin && (
-          <Marker position={[origin.coordinates[1], origin.coordinates[0]]}>
-            <div className="relative">
-              <div className="absolute -inset-2 bg-green-500 rounded-full opacity-25 animate-ping" />
-              <div className="relative bg-green-500 text-white p-2 rounded-full shadow-lg">
-                <Navigation className="w-5 h-5" />
-              </div>
-            </div>
+        {origin && isValidCoord(origin.coordinates) && (
+          <Marker position={[origin.coordinates[1], origin.coordinates[0]]} icon={originIcon}>
+            <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent={false}>
+              Origin
+            </Tooltip>
           </Marker>
         )}
         {/* Waypoint Markers */}
         {waypoints.map((waypoint, index) => (
-          <Marker key={index} position={[waypoint.location.coordinates[1], waypoint.location.coordinates[0]]}>
-            <div className="relative group">
-              <div className="bg-blue-500 text-white px-3 py-2 rounded-full shadow-lg font-semibold text-sm">
-                {waypoint.order + 1}
-              </div>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          isValidCoord(waypoint.location?.coordinates) ? (
+            <Marker
+              key={index}
+              position={[waypoint.location.coordinates[1], waypoint.location.coordinates[0]]}
+              icon={createCircleIcon('#3b82f6', '#fff', 34, String(waypoint.order + 1))}
+            >
+              <Tooltip direction="top" offset={[0, -18]} opacity={1}>
                 {waypoint.name}
-              </div>
-            </div>
-          </Marker>
+              </Tooltip>
+            </Marker>
+          ) : null
         ))}
         {/* Destination Marker */}
-        {destination && (
-          <Marker position={[destination.coordinates[1], destination.coordinates[0]]}>
-            <div className="relative">
-              <div className="absolute -inset-2 bg-red-500 rounded-full opacity-25 animate-ping" />
-              <div className="relative bg-red-500 text-white p-2 rounded-full shadow-lg">
-                <MapPin className="w-5 h-5" />
-              </div>
-            </div>
+        {destination && isValidCoord(destination.coordinates) && (
+          <Marker position={[destination.coordinates[1], destination.coordinates[0]]} icon={destinationIcon}>
+            <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent={false}>
+              Destination
+            </Tooltip>
           </Marker>
         )}
       </MapContainer>
