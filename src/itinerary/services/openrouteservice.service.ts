@@ -1,4 +1,12 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+  ForbiddenException,
+  HttpException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
@@ -24,7 +32,7 @@ export class OpenRouteService {
     travelMode?: 'driving-car' | 'cycling-regular' | 'foot-walking';
   }) {
     if (!this.apiKey) {
-      throw new BadRequestException('OpenRouteService API key not configured');
+      throw new ServiceUnavailableException('OpenRouteService API key not configured');
     }
     try {
       const { origin, destination, waypoints = [], travelMode = 'driving-car' } = params;
@@ -56,15 +64,38 @@ export class OpenRouteService {
         geometry: route.geometry,
         steps: route.segments[0]?.steps || [],
       };
-    } catch (error) {
-      this.logger.error('ORS API error:', error.response?.data || error.message);
+    } catch (error: any) {
+      const data = error?.response?.data;
+      this.logger.error('ORS API error:', data || error.message);
+      // If ORS returned an HTTP status, propagate it as an HttpException
+      if (error.response && typeof error.response.status === 'number') {
+        const status = error.response.status;
+        const msg = data?.message ?? data ?? error.message;
+        // Map common ORS statuses to proper Nest exceptions so the frontend receives accurate HTTP codes
+        if (status === 401) {
+          this.logger.error(`ORS returned 401 Unauthorized. Please check ORS_API_KEY and account status.`);
+          throw new ServiceUnavailableException('Routing service unavailable (invalid ORS API key)');
+        }
+        if (status === 403) {
+          this.logger.error(`ORS returned 403 Forbidden. Check ORS_API_KEY permissions.`);
+          throw new ServiceUnavailableException('Routing service forbidden (check ORS API key permissions)');
+        }
+        if (status === 429) {
+          throw new HttpException(msg, 429);
+        }
+        if (status === 503) {
+          throw new ServiceUnavailableException(msg);
+        }
+        // For all other statuses, throw a generic HttpException preserving status
+        throw new HttpException(msg, status);
+      }
       throw new BadRequestException('Failed to get directions');
     }
   }
 
   async geocode(query: string) {
     if (!this.apiKey) {
-      throw new BadRequestException('OpenRouteService API key not configured');
+      throw new ServiceUnavailableException('OpenRouteService API key not configured');
     }
     try {
       const url = `${this.baseUrl}/geocode/search`;
@@ -86,15 +117,25 @@ export class OpenRouteService {
           lng: result.geometry.coordinates[0],
         },
       };
-    } catch (error) {
-      this.logger.error('ORS geocode error:', error.response?.data || error.message);
+    } catch (error: any) {
+      const data = error?.response?.data;
+      this.logger.error('ORS geocode error:', data || error.message);
+      if (error.response && typeof error.response.status === 'number') {
+        const status = error.response.status;
+        const msg = data?.message ?? data ?? error.message;
+        if (status === 401) throw new UnauthorizedException(msg);
+        if (status === 403) throw new ForbiddenException(msg);
+  if (status === 429) throw new HttpException(msg, 429);
+        if (status === 503) throw new ServiceUnavailableException(msg);
+        throw new HttpException(msg, status);
+      }
       throw new BadRequestException('Failed to geocode address');
     }
   }
 
   async searchPlaces(query: string, location?: { lat: number; lng: number }) {
     if (!this.apiKey) {
-      throw new BadRequestException('OpenRouteService API key not configured');
+      throw new ServiceUnavailableException('OpenRouteService API key not configured');
     }
     try {
       const url = `${this.baseUrl}/geocode/search`;
@@ -104,8 +145,8 @@ export class OpenRouteService {
         size: 10,
       };
       if (location) {
-        params.focus.point.lat = location.lat;
-        params.focus.point.lon = location.lng;
+        // ensure focus object exists
+        params.focus = { point: { lat: location.lat, lon: location.lng } };
       }
       const response = await axios.get(url, { params });
       return response.data.features.map(place => ({
@@ -118,8 +159,18 @@ export class OpenRouteService {
         },
         category: place.properties.category,
       }));
-    } catch (error) {
-      this.logger.error('ORS search error:', error.response?.data || error.message);
+    } catch (error: any) {
+      const data = error?.response?.data;
+      this.logger.error('ORS search error:', data || error.message);
+      if (error.response && typeof error.response.status === 'number') {
+        const status = error.response.status;
+        const msg = data?.message ?? data ?? error.message;
+        if (status === 401) throw new UnauthorizedException(msg);
+        if (status === 403) throw new ForbiddenException(msg);
+  if (status === 429) throw new HttpException(msg, 429);
+        if (status === 503) throw new ServiceUnavailableException(msg);
+        throw new HttpException(msg, status);
+      }
       throw new BadRequestException('Failed to search places');
     }
   }

@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseInterceptors, UploadedFile, Get } from '@nes
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LandmarksService } from './landmarks.service';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import * as path from 'path';
 
 @Controller('landmarks')
 export class LandmarksController {
@@ -28,11 +28,11 @@ export class LandmarksController {
       destination: './uploads',
       filename: (req, file, cb) => {
         const randomName = Array(32).fill(null).map(() => Math.round(Math.random() * 16).toString(16)).join('');
-        cb(null, `${randomName}${extname(file.originalname)}`);
+        cb(null, `${randomName}${path.extname(file.originalname)}`);
       }
     }),
     limits: {
-      fileSize: 50 * 1024 * 1024, // 50 MB limit
+      fileSize: 10 * 1024 * 1024, // 10MB
     },
   }))
   async recognizeFromFile(@UploadedFile() file: Express.Multer.File) {
@@ -41,9 +41,21 @@ export class LandmarksController {
     }
 
     try {
-      // Pass the file path to the service
-      const result = await this.landmarksService.detectLandmarkFromFile(file.path);
-      return result;
+      // Multer with diskStorage will provide a `path` property on the file object.
+      // When memory storage is used, `buffer` will be available instead.
+      const rawPath = (file as any).path ?? null;
+      if (rawPath) {
+        // Ensure we send an absolute path to the Python script so it treats it as a local file
+        const absolutePath = path.isAbsolute(rawPath) ? rawPath : path.join(process.cwd(), rawPath);
+        return await this.landmarksService.detectLandmarkFromFile(absolutePath);
+      }
+
+      const fileBuffer = (file as any).buffer ?? null;
+      if (fileBuffer) {
+        return await this.landmarksService.detectLandmarkFromFile(fileBuffer);
+      }
+
+      return { success: false, error: 'Uploaded file missing buffer or disk path' };
     } catch (error) {
       return { success: false, error: error.message };
     }

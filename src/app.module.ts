@@ -7,6 +7,7 @@ import { UserModule } from './user/user.module';
 import { LandmarksModule } from './landmarks/landmarks.module';
 import { ItineraryModule } from './itinerary/itinerary.module';
 import { BudgetOptimizerModule } from './budget-optimizer/budget-optimizer.module';
+import { HotelsModule } from './hotels/hotels.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { BudgetOptimizerModule } from './budget-optimizer/budget-optimizer.modul
     UserModule,
     LandmarksModule,
     ItineraryModule,
-    BudgetOptimizerModule
+    BudgetOptimizerModule,
+    HotelsModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -14,9 +14,9 @@ export class WaypointDto {
   @IsNotEmpty()
   name: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  address: string;
+  address?: string;
 
   @ValidateNested()
   @Type(() => LocationDto)

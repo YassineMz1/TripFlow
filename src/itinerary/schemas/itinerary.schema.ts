@@ -8,8 +8,8 @@ export class Waypoint {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true })
-  address: string;
+  @Prop()
+  address?: string;
 
   @Prop({ required: true, type: { lat: Number, lng: Number } })
   location: {
@@ -31,8 +31,8 @@ const WaypointSchema = SchemaFactory.createForClass(Waypoint);
 
 @Schema({ timestamps: true })
 export class Itinerary {
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  userId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  userId?: Types.ObjectId;
 
   @Prop({ required: true })
   title: string;

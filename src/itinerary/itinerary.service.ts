@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Itinerary, ItineraryDocument } from './schemas/itinerary.schema';
@@ -8,6 +8,7 @@ import { OpenRouteService } from './services/openrouteservice.service';
 
 @Injectable()
 export class ItineraryService {
+  private readonly logger = new Logger(ItineraryService.name);
   constructor(
     @InjectModel(Itinerary.name) private itineraryModel: Model<ItineraryDocument>,
     private openRouteService: OpenRouteService,
@@ -17,25 +18,113 @@ export class ItineraryService {
    * Créer un nouvel itinéraire avec calcul de route
    */
   async create(userId: string, createItineraryDto: CreateItineraryDto): Promise<Itinerary> {
-    // Calculer la route via Mapbox
+    // Ensure origin and destination contain coordinates. If missing, try to geocode the addresses.
+    try {
+      if (!createItineraryDto.origin?.location) {
+        if (createItineraryDto.origin?.address) {
+          const geo = await this.openRouteService.geocode(createItineraryDto.origin.address);
+          (createItineraryDto as any).origin = { ...(createItineraryDto as any).origin, location: geo.location };
+        }
+      }
+
+      if (!createItineraryDto.destination?.location) {
+        if (createItineraryDto.destination?.address) {
+          const geo = await this.openRouteService.geocode(createItineraryDto.destination.address);
+          (createItineraryDto as any).destination = { ...(createItineraryDto as any).destination, location: geo.location };
+        }
+      }
+    } catch (err) {
+      // Geocoding failed; allow downstream validation to respond with a helpful message
+      this.logger?.error?.('Geocoding failed while creating itinerary:', err);
+    }
+
+    // If coordinates are still missing, the schema will reject the document — return a clear 400 instead
+    if (!createItineraryDto.origin?.location || !createItineraryDto.destination?.location) {
+      throw new BadRequestException('origin.location and destination.location are required. Provide coordinates or a valid address to geocode.');
+    }
+
+    // Normalize date fields: plannedDate may be provided as a string
+    try {
+      const maybePlanned = (createItineraryDto as any).plannedDate || (createItineraryDto as any).startDate;
+      if (maybePlanned) {
+        const d = new Date(maybePlanned as any);
+        if (!isNaN(d.getTime())) {
+          (createItineraryDto as any).plannedDate = d;
+        } else {
+          // drop invalid date to avoid Mongoose CastError
+          delete (createItineraryDto as any).plannedDate;
+        }
+      }
+    } catch (e) {
+      // ignore; we'll validate later
+      this.logger.warn('Failed to normalize plannedDate', (e as any)?.message || e);
+    }
+
+    // Calculate the route now that locations are present
     const routeData = await this.calculateRoute(createItineraryDto);
 
-    const itinerary = new this.itineraryModel({
-      ...createItineraryDto,
-      userId: new Types.ObjectId(userId),
-      routeData,
-    });
+    // Ensure the server-set userId overrides any client-supplied userId
+    const safePayload: any = { ...createItineraryDto };
+    delete safePayload.userId;
+    safePayload.userId = new Types.ObjectId(userId);
+    safePayload.routeData = routeData;
 
-    return itinerary.save();
+    const itinerary = new this.itineraryModel(safePayload);
+
+    try {
+      return await itinerary.save();
+    } catch (err) {
+      this.logger.error('Failed to save itinerary:', err?.message || err);
+      // Convert common Mongoose validation/cast errors to BadRequest
+      throw new BadRequestException(err?.message || 'Failed to save itinerary');
+    }
   }
 
   async createPublic(createItineraryDto: CreateItineraryDto): Promise<Itinerary> {
-  const itinerary = new this.itineraryModel({
-    ...createItineraryDto,
-    isPublic: true,
-    
-  });
-  return itinerary.save();
+  // Try to geocode origin/destination if coordinates missing
+  try {
+    if (!createItineraryDto.origin?.location && createItineraryDto.origin?.address) {
+      const geo = await this.openRouteService.geocode(createItineraryDto.origin.address);
+      (createItineraryDto as any).origin = { ...(createItineraryDto as any).origin, location: geo.location };
+    }
+    if (!createItineraryDto.destination?.location && createItineraryDto.destination?.address) {
+      const geo = await this.openRouteService.geocode(createItineraryDto.destination.address);
+      (createItineraryDto as any).destination = { ...(createItineraryDto as any).destination, location: geo.location };
+    }
+  } catch (err) {
+    this.logger?.error?.('Geocoding failed while creating public itinerary:', err);
+  }
+
+  if (!createItineraryDto.origin?.location || !createItineraryDto.destination?.location) {
+    throw new BadRequestException('origin.location and destination.location are required. Provide coordinates or a valid address to geocode.');
+  }
+  // Normalize plannedDate similarly
+  try {
+    const maybePlanned = (createItineraryDto as any).plannedDate || (createItineraryDto as any).startDate;
+    if (maybePlanned) {
+      const d = new Date(maybePlanned as any);
+      if (!isNaN(d.getTime())) {
+        (createItineraryDto as any).plannedDate = d;
+      } else {
+        delete (createItineraryDto as any).plannedDate;
+      }
+    }
+  } catch (e) {
+    this.logger.warn('Failed to normalize plannedDate for public itinerary', (e as any)?.message || e);
+  }
+
+  // Ensure public itineraries are not attributed to any user even if client supplied a userId
+  const safePayload: any = { ...createItineraryDto };
+  if (safePayload.userId) delete safePayload.userId;
+  safePayload.isPublic = true;
+
+  const itinerary = new this.itineraryModel(safePayload);
+  try {
+    return await itinerary.save();
+  } catch (err) {
+    this.logger.error('Failed to save public itinerary:', err?.message || err);
+    throw new BadRequestException(err?.message || 'Failed to save itinerary');
+  }
 }
   /**
    * Récupérer tous les itinéraires d'un utilisateur

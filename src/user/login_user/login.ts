@@ -37,6 +37,7 @@ export class LoginService {
             sub: user._id,
             email: user.email,
             role: profile.role,
+            photoProfil: profile.photoProfil,
         };
 
         const token = this.jwtService.sign(payload);
@@ -48,10 +49,10 @@ export class LoginService {
                 sub: user._id,
                 email: user.email,
                 role: profile.role,
+                photoProfil: profile.photoProfil,
                 prenom: profile.prenom,
                 nom: profile.nom,
                 dateNaissance: profile.dateNaissance,
-                photoProfil: profile.photoProfil,
             },
             profile: profile
         };

@@ -50,6 +50,8 @@ export class ItineraryController {
    * GET /itinerary/public/all
    * IMPORTANT: Must be before /itinerary/:id to avoid route conflict
    */
+
+
   @Get('public/all')
   async findPublicItineraries(@Query('tags') tags?: string) {
     const filters = {
@@ -93,7 +95,7 @@ export class ItineraryController {
    * Récupérer un itinéraire par ID
    * GET /itinerary/:id
    */
-  @Get(':id')
+  @Get('findone/:id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Request() req, @Param('id') id: string) {
     const userId = req.user.userId || req.user.sub;
@@ -104,7 +106,7 @@ export class ItineraryController {
    * Mettre à jour un itinéraire
    * PUT /itinerary/:id
    */
-  @Put(':id')
+  @Put('update/:id')
   @UseGuards(JwtAuthGuard)
   async update(
     @Request() req,
@@ -119,7 +121,7 @@ export class ItineraryController {
    * Supprimer un itinéraire
    * DELETE /itinerary/:id
    */
-  @Delete(':id')
+  @Delete('delete/:id')
   @UseGuards(JwtAuthGuard)
   async remove(@Request() req, @Param('id') id: string) {
     const userId = req.user.userId || req.user.sub;
@@ -203,6 +205,8 @@ export class ItineraryController {
     destination: string | { lat: number; lng: number } | number[];
     waypoints?: Array<string | { lat: number; lng: number } | number[]>;
     travelMode?: 'driving' | 'walking' | 'bicycling' | 'transit';
+    // Some frontends send `mode` instead of `travelMode` and values like 'cycling'
+    mode?: string;
     optimizeWaypoints?: boolean;
     avoid?: string[];
   }) {
@@ -213,21 +217,51 @@ export class ItineraryController {
         throw new Error('String coordinates are not supported for this route calculation');
       }
       if (Array.isArray(coord)) {
-        // Interpret arrays as [lng, lat] for ORS
-        return { lat: coord[1], lng: coord[0] };
+        // Heuristic to decide whether array is [lng, lat] (common) or [lat, lng]
+        const a0 = Number(coord[0]);
+        const a1 = Number(coord[1]);
+        if (Number.isNaN(a0) || Number.isNaN(a1)) {
+          throw new Error('Coordinate array must contain numbers');
+        }
+        // If the first number falls outside latitude range, it must be longitude -> [lng, lat]
+        if (a0 < -90 || a0 > 90) {
+          return { lat: a1, lng: a0 };
+        }
+        // If the second number falls outside latitude range, assume [lat, lng]
+        if (a1 < -90 || a1 > 90) {
+          return { lat: a0, lng: a1 };
+        }
+        // Ambiguous: prefer [lng, lat] because ORS expects [lng, lat] coordinates in arrays
+        return { lat: a1, lng: a0 };
       }
       return coord;
+    }
+
+    // Map frontend travel modes to ORS travel profiles
+    function mapTravelMode(modeInput?: string) {
+      if (!modeInput) return 'driving-car';
+      const m = String(modeInput).toLowerCase();
+      if (m === 'driving' || m === 'car') return 'driving-car';
+      if (m === 'walking' || m === 'foot') return 'foot-walking';
+      if (m === 'cycling' || m === 'bicycling' || m === 'bike') return 'cycling-regular';
+      // ORS doesn't have a transit profile on free tier; fallback to driving
+      if (m === 'transit' || m === 'public' || m === 'train' || m === 'bus') return 'driving-car';
+      // default
+      return 'driving-car';
     }
 
     const origin = normalizeCoordinate(routeParams.origin);
     const destination = normalizeCoordinate(routeParams.destination);
     const waypoints = (routeParams.waypoints || []).map(normalizeCoordinate);
+    const requested = routeParams.mode || routeParams.travelMode;
+    const travelMode = mapTravelMode(requested);
+    this.itineraryService?.['logger']?.log?.(`Using travelMode=${travelMode} (requested='${requested}')`);
 
     return this.openRouteService.getDirections({
       origin,
       destination,
       waypoints,
-      travelMode: 'driving-car',
+      travelMode: travelMode as any,
     });
   }
 }
