@@ -11,8 +11,8 @@ export class Booking {
   @Prop({ required: true })
   hotelId: string;
 
-  @Prop()
-  userId?: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  userId?: Types.ObjectId | string;
 
   @Prop({ required: true })
   checkin: string;

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean } from 'class-validator';
 
 export class SearchHotelsDto {
   @IsString()
@@ -19,4 +19,8 @@ export class SearchHotelsDto {
   @IsOptional()
   @IsNumber()
   rooms?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  photosOnly?: boolean;
 }

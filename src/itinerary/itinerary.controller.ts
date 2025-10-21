@@ -246,7 +246,6 @@ export class ItineraryController {
       if (m === 'cycling' || m === 'bicycling' || m === 'bike') return 'cycling-regular';
       // ORS doesn't have a transit profile on free tier; fallback to driving
       if (m === 'transit' || m === 'public' || m === 'train' || m === 'bus') return 'driving-car';
-      // default
       return 'driving-car';
     }
 
