@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const runtimeCaching = [
+  // Navigation handler: try network first, then fall back to cached app shell (/) when offline
+  {
+    urlPattern: /\/[^?]*$/i,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'pages-shell-v1',
+      networkTimeoutSeconds: 5,
+      expiration: { maxEntries: 50 },
+    },
+  },
   {
     urlPattern: /^\/_next\//i,
     handler: 'CacheFirst',
@@ -30,6 +40,12 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  // Precache only the main app shell pages we want available offline
+  additionalManifestEntries: [
+    { url: '/', revision: null },
+    { url: '/hotels', revision: null },
+    { url: '/profile', revision: null },
+  ],
   buildExcludes: [/marker-icon.*\\.png$/i],
   runtimeCaching,
 });

@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppBar from "../components/AppBar";
 import OfflineIndicator from "../components/OfflineIndicator";
+import OfflineFallback from "../components/OfflineFallback";
 import { TranslationProvider } from "../lib/translation";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -73,9 +74,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             } catch (e) {}
           `}
         </Script>
+        <Script id="global-error-normalizer" strategy="beforeInteractive">
+          {`
+            // Normalize unhandled promise rejections so DevOverlay gets readable messages
+            window.addEventListener('unhandledrejection', function(ev) {
+              try {
+                var reason = ev && ev.reason;
+                if (!reason) return;
+                // If the rejection reason is an Event (e.g., MessageEvent/AbortEvent), coerce to a string
+                if (typeof reason === 'object' && !(reason instanceof Error)) {
+                  var type = reason && reason.type ? reason.type : null;
+                  var str = type ? ('Unhandled rejection event: ' + type) : String(reason);
+                  // Replace reason with an Error so frameworks display it nicely
+                  ev.reason = new Error(str);
+                }
+              } catch (e) {
+                // ignore
+              }
+            });
+            window.addEventListener('error', function(ev) {
+              // ensure runtime errors are at least logged
+              try { console.error('Window error', ev.error || ev.message || ev); } catch(e) {}
+            });
+          `}
+        </Script>
   <TranslationProvider>
   <AppBar initialLang={initialLang} initialTheme={initialTheme} />
   <OfflineIndicator />
+  <OfflineFallback message={"You're offline — viewing cached app shell"} />
   <div className="pt-16">{children}</div>
     {/* Register the service worker on the client after hydration */}
     <Script src="/sw-register.js" strategy="afterInteractive" />

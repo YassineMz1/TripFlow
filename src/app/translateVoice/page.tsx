@@ -17,6 +17,7 @@ export default function TranslateVoicePage() {
     const [targetLang, setTargetLang] = useState("fr");
     const [translating, setTranslating] = useState(false);
     const inputRef = useRef<HTMLTextAreaElement | null>(null);
+    const recognitionRef = useRef<any | null>(null);
     const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
     const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
     const [recordingSupported, setRecordingSupported] = useState(false);
@@ -29,52 +30,108 @@ export default function TranslateVoicePage() {
     }, []);
 
     const onToggleListen = async () => {
+        // If not currently listening, start.
         if (!listening) {
-            if (!recordingSupported) {
-                alert("Audio recording not supported in this browser.");
+            // Prefer Web Speech API when available for live recognition
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                try {
+                    const recog = new SpeechRecognition();
+                    recognitionRef.current = recog;
+                    recog.lang = sourceLang || 'en-US';
+                    recog.interimResults = false;
+                    recog.maxAlternatives = 1;
+                    recog.onresult = (ev: any) => {
+                        try {
+                            const text = ev.results && ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript;
+                            if (text) setOriginalText(String(text));
+                        } catch (e) {
+                            console.warn('speech recognition result parse failed', e);
+                        }
+                    };
+                    recog.onerror = (e: any) => {
+                        console.warn('SpeechRecognition error', e);
+                        // Stop and fallback to MediaRecorder flow if recognition fails in a recoverable way
+                        try {
+                            recog.stop();
+                        } catch {}
+                        recognitionRef.current = null;
+                        setListening(false);
+                        // fallback to MediaRecorder flow below
+                        void startMediaRecorderFallback();
+                    };
+                    recog.onend = () => {
+                        setListening(false);
+                        recognitionRef.current = null;
+                    };
+                    recog.start();
+                    setListening(true);
+                    return;
+                } catch (err) {
+                    console.warn('SpeechRecognition start failed, falling back to recorder', err);
+                    // continue to recorder fallback
+                }
+            }
+
+            // Recorder fallback (existing flow)
+            await startMediaRecorderFallback();
+        } else {
+            // currently listening — stop whichever mechanism is active
+            if (recognitionRef.current) {
+                try {
+                    recognitionRef.current.stop();
+                } catch {}
+                recognitionRef.current = null;
+                setListening(false);
                 return;
             }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const recorder = new window.MediaRecorder(stream);
-                setMediaRecorder(recorder);
-                setAudioChunks([]);
-                recorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) setAudioChunks((prev) => [...prev, e.data]);
-                };
-                recorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    // Upload audioBlob to backend for speech-to-text
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob);
-                    formData.append('lang', sourceLang);
-                    try {
-                        const resp = await fetch('/api/speech-to-text', {
-                            method: 'POST',
-                            body: formData,
-                        });
-                        const data = await resp.json();
-                        if (resp.ok && data.text) {
-                            setOriginalText(data.text);
-                        } else {
-                            setOriginalText('');
-                            alert('Speech recognition failed.');
-                        }
-                    } catch (err) {
-                        setOriginalText('');
-                        alert('Speech recognition error.');
-                    }
-                };
-                recorder.start();
-                setListening(true);
-            } catch (err) {
-                alert('Could not start audio recording.');
-            }
-        } else {
             mediaRecorder?.stop();
             setListening(false);
         }
     };
+
+    // Helper to start existing MediaRecorder + upload fallback
+    async function startMediaRecorderFallback() {
+        if (!recordingSupported) {
+            alert('Audio recording not supported in this browser.');
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new window.MediaRecorder(stream);
+            setMediaRecorder(recorder);
+            setAudioChunks([]);
+            recorder.ondataavailable = (e: any) => {
+                if (e.data && e.data.size > 0) setAudioChunks((prev) => [...prev, e.data]);
+            };
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+                formData.append('lang', sourceLang);
+                try {
+                    const resp = await fetch('/api/speech-to-text', { method: 'POST', body: formData });
+                    let data: any = null;
+                    try { data = await resp.json(); } catch { data = null; }
+                    if (data && typeof data.text === 'string' && data.text.trim().length > 0) {
+                        setOriginalText(data.text);
+                        return;
+                    }
+                    if (typeof data === 'string' && data.trim().length > 0) { setOriginalText(data.trim()); return; }
+                    // fallback: no alert, but empty string so user can try again
+                    setOriginalText('');
+                    console.warn('speech-to-text: no transcript', resp.status, data);
+                } catch (err) {
+                    console.warn('speech-to-text fetch failed', err);
+                    setOriginalText('');
+                }
+            };
+            recorder.start();
+            setListening(true);
+        } catch (err) {
+            alert('Could not start audio recording.');
+        }
+    }
 
     // Remove browser SpeechRecognition logic
 
