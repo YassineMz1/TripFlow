@@ -91,3 +91,43 @@ body {
   }
 }
 
+
+/* ------------------------- */
+/* Browser compatibility helpers */
+/* Ensure consistent text-size behavior across browsers (Chrome, Edge, Safari) */
+html {
+  -webkit-text-size-adjust: 100%; /* iOS Safari, older WebKit */
+  -ms-text-size-adjust: 100%; /* IE/Edge legacy */
+  text-size-adjust: 100%; /* standard */
+}
+
+/* Backdrop filter utility with WebKit prefix for Safari */
+.backdrop-blur {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* Mask image helper (adds WebKit-prefixed property for broader support) */
+.mask-image {
+  -webkit-mask-image: var(--mask-image, none);
+  mask-image: var(--mask-image, none);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: cover;
+  mask-size: cover;
+}
+
+/* user-select utilities with vendor prefixes */
+.select-none {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.select-text {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+

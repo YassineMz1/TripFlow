@@ -1,5 +1,21 @@
 import { withApiBase } from "./env";
 
+// Module-level fetch with timeout helper used across API calls
+const DEFAULT_TIMEOUT = 15000; // ms
+async function fetchWithTimeout(input: RequestInfo, init?: RequestInit, timeout = DEFAULT_TIMEOUT) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(input, { ...(init || {}), signal: controller.signal });
+    return res;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') throw new Error(`Request to ${String(input)} timed out after ${timeout}ms`);
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export type Hotel = {
   id: string;
   name: string;
@@ -25,9 +41,25 @@ export async function searchHotels(params: SearchHotelsParams): Promise<Hotel[]>
   const fallbackUrl = "/api/hotels/search"; // local Next dev route
 
   // helper to call an endpoint and return response or throw network error
+  // fetch with timeout helper
+  const DEFAULT_TIMEOUT = 15000; // ms
+  async function fetchWithTimeout(input: RequestInfo, init?: RequestInit, timeout = DEFAULT_TIMEOUT) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(input, { ...(init || {}), signal: controller.signal });
+      return res;
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw new Error(`Request to ${String(input)} timed out after ${timeout}ms`);
+      throw err;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
   async function tryFetch(url: string, body: any) {
     try {
-      const r = await fetch(url, {
+      const r = await fetchWithTimeout(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body ?? {}),
@@ -176,4 +208,52 @@ export async function bookHotel(hotelId: string, data: { checkIn: string; checkO
     throw new Error(`Failed to book hotel: ${res.status} ${res.statusText}${text ? ` - ${text}` : ""}`);
   }
   return res.json();
+}
+
+export async function fetchRandomHotels(limit: number = 0, photosOnly: boolean = true): Promise<Hotel[]> {
+  // Use backend /hotels/all endpoint; limit=0 requests "no limit" (server will apply HARD_CAP).
+  const q = `?limit=${encodeURIComponent(String(limit))}${photosOnly ? `&photosOnly=${encodeURIComponent(String(photosOnly))}` : ''}`;
+  const backendUrl = withApiBase(`/hotels/all${q}`);
+  // Local Next dev fallback: /api/hotels/all is not present, use /api/hotels/search instead
+  const fallbackUrl = `/api/hotels/search`;
+
+  async function tryFetch(url: string) {
+    try {
+      const r = await fetchWithTimeout(url, { method: 'GET', credentials: 'include' });
+      return r;
+    } catch (err: any) {
+      throw new Error(`Network error while fetching ${url}: ${err?.message || String(err)}`);
+    }
+  }
+
+  let backendErr: string | null = null;
+  if (backendUrl) {
+    try {
+      const r = await tryFetch(backendUrl);
+      if (r.ok) {
+        const json = await r.json().catch(() => null);
+        return normalizeHotelsResponse(json);
+      }
+      const text = await r.text().catch(() => '');
+      backendErr = `Backend ${r.status} ${r.statusText}${text ? ` - ${text}` : ''}`;
+      console.warn('fetchRandomHotels: backend failed:', backendErr);
+    } catch (err: any) {
+      backendErr = err?.message || String(err);
+      console.warn('fetchRandomHotels: backend network error:', backendErr);
+    }
+  }
+
+  try {
+    const fb = await tryFetch(fallbackUrl);
+    if (!fb.ok) {
+      const text = await fb.text().catch(() => '');
+      throw new Error(`Failed to fetch random hotels: ${fb.status} ${fb.statusText}${text ? ` - ${text}` : ''}`);
+    }
+    const raw = await fb.json().catch(() => null);
+    return normalizeHotelsResponse(raw);
+  } catch (fbErr: any) {
+    const finalMsg = fbErr?.message || String(fbErr);
+    const combined = backendErr ? `${backendErr}; fallback: ${finalMsg}` : finalMsg;
+    throw new Error(`Failed to fetch random hotels: ${combined}`);
+  }
 }

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 3001",
-    "build": "next build --turbopack",
-    "start": "next start",
+  "dev": "next dev -p 3001",
+  "build": "next build",
+  "start": "next start -p 3001",
     "lint": "eslint"
   },
   "dependencies": {
@@ -37,7 +37,13 @@
     "@types/stripe": "^8.0.416",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "next-pwa": "^5.6.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "workbox-core": "^7.3.0",
+    "workbox-expiration": "^7.3.0",
+    "workbox-precaching": "^7.3.0",
+    "workbox-routing": "^7.3.0",
+    "workbox-strategies": "^7.3.0"
   }
 }

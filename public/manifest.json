@@ -1,0 +1,39 @@
+{
+  "name": "TripFlow",
+  "short_name": "TripFlow",
+  "description": "Plan and share travel itineraries with maps and recommendations.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5a4",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/plane.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/plane.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New itinerary",
+      "short_name": "New",
+      "description": "Create a new itinerary",
+      "url": "/itineraries/new?source=pwa",
+      "icons": [{ "src": "/images/shortcut-new.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Explore",
+      "short_name": "Explore",
+      "description": "Discover places and suggestions",
+      "url": "/explore?source=pwa",
+      "icons": [{ "src": "/images/shortcut-explore.png", "sizes": "192x192" }]
+    }
+  ]
+}

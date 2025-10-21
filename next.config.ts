@@ -1,4 +1,39 @@
 /** @type {import('next').NextConfig} */
+const runtimeCaching = [
+  {
+    urlPattern: /^\/_next\//i,
+    handler: 'CacheFirst',
+    options: {
+      cacheName: 'nextjs-static-v1',
+      expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+    },
+  },
+  {
+    urlPattern: /^\/icons\//i,
+    handler: 'CacheFirst',
+    options: { cacheName: 'icons-v1', expiration: { maxEntries: 50 } },
+  },
+  {
+    urlPattern: /\/api\//i,
+    handler: 'NetworkFirst',
+    options: { cacheName: 'api-v1' },
+  },
+  {
+    urlPattern: /\.(?:png|jpg|jpeg|svg)$/i,
+    handler: 'CacheFirst',
+    options: { cacheName: 'images-v1', expiration: { maxEntries: 200 } },
+  },
+];
+
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+  buildExcludes: [/marker-icon.*\\.png$/i],
+  runtimeCaching,
+});
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -7,9 +42,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   allowedDevOrigins: [
-    'http://localhost:3000',
     'http://localhost:3001',
   ],
-}
+};
 
-module.exports = nextConfig
+module.exports = withPWA(nextConfig);

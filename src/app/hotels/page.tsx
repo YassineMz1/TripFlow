@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { searchHotels, bookHotel, Hotel } from "@/lib/hotels-api";
+import React, { useState, useEffect, useRef } from "react";
+import { searchHotels, bookHotel, fetchRandomHotels, Hotel } from "@/lib/hotels-api";
 
 export default function HotelsPage() {
   const [city, setCity] = useState("");
@@ -8,6 +8,7 @@ export default function HotelsPage() {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
   const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState<string | null>(null);
@@ -24,9 +25,15 @@ export default function HotelsPage() {
     try {
       const results = await searchHotels({ city, checkIn, checkOut, guests });
       setRawResponse(results);
-      setHotels(results);
+      const withPhotos = (results ?? []).filter((h: Hotel) => {
+        if (!h) return false;
+        const img = (h as any).images ?? (h as any).photos ?? (h as any).image;
+        if (!img) return false;
+        if (Array.isArray(img)) return img.length > 0;
+        return String(img).trim().length > 0;
+      });
+      setHotels(withPhotos);
     } catch (err: any) {
-      // Provide detailed message; preserve original error for logs
       const msg = err?.message || "Failed to fetch hotels";
       setError(msg);
       console.error("searchHotels error:", err);
@@ -35,7 +42,91 @@ export default function HotelsPage() {
     }
   };
 
-  // Direct programmatic search helper used by Quick sample button (avoids relying on form dispatch)
+    function Modal({ selected, onClose, onBook, booking, booked }: {
+      selected: Hotel;
+      onClose: () => void;
+      onBook: (hotel: Hotel) => Promise<void> | void;
+      booking: string | null;
+      booked: string | null;
+    }) {
+      const images: string[] = Array.isArray((selected as any).images) ? (selected as any).images : ((selected as any).image ? [(selected as any).image] : []);
+      const [index, setIndex] = useState(0);
+      const overlayRef = useRef<HTMLDivElement | null>(null);
+
+      useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        overlayRef.current?.focus();
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') onClose();
+          if (e.key === 'ArrowRight') setIndex(i => Math.min(i + 1, images.length - 1));
+          if (e.key === 'ArrowLeft') setIndex(i => Math.max(i - 1, 0));
+        };
+        window.addEventListener('keydown', onKey);
+        return () => {
+          window.removeEventListener('keydown', onKey);
+          document.body.style.overflow = prev;
+        };
+      }, [images.length, onClose]);
+
+      const setActive = (i: number) => setIndex(i);
+
+      const priceText = (() => {
+        try {
+          if (selected && typeof selected.price === 'object' && selected.price !== null) {
+            const amt = (selected.price as any).amount ?? (selected.price as any).value ?? '';
+            const cur = (selected.price as any).currency ?? (selected as any).currency ?? '';
+            return `${amt}${cur ? ` ${cur}` : ''}`;
+          }
+          return `${selected.price ?? ''}${selected.currency ? ` ${selected.currency}` : ''}`;
+        } catch (e) { return String((selected as any).price ?? ''); }
+      })();
+
+      return (
+        <div ref={overlayRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="bg-[var(--surface)] rounded-2xl shadow-xl max-w-6xl w-full overflow-hidden grid grid-cols-1 md:grid-cols-3" onClick={onClose}>
+            <div className="md:col-span-2" onClick={(e) => e.stopPropagation()}>
+              <div className="relative w-full h-72 md:h-96 bg-black">
+                {images[index] ? (
+                  <img src={images[index]} alt={`${selected.name} photo ${index+1}`} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gray-200" />
+                )}
+                <button aria-label="Close" onClick={onClose} className="absolute right-3 top-3 bg-black/40 hover:bg-black/60 text-white rounded-full w-9 h-9 flex items-center justify-center">✕</button>
+                <div className="absolute left-4 bottom-4">
+                  <h3 className="text-white text-xl md:text-2xl font-bold drop-shadow">{selected.name}</h3>
+                  <div className="text-sm text-white/90 mt-1">{(selected as any).address}{(selected as any).city ? ` · ${(selected as any).city}` : ''}</div>
+                </div>
+              </div>
+              {images.length > 1 && (
+                <div className="px-4 py-3 flex gap-2 overflow-x-auto">
+                  {images.map((src, i) => (
+                    <button key={i} onClick={() => setActive(i)} className={`flex-none rounded-lg overflow-hidden border-2 ${i === index ? 'border-blue-500' : 'border-transparent'}`}>
+                      <img src={src} alt={`${selected.name} thumb ${i+1}`} className="w-28 h-20 object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm text-[var(--muted-foreground)]">{(selected as any).category ?? 'Hotel'}</div>
+                  <div className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{priceText}</div>
+                </div>
+              </div>
+              {(selected as any).description && <div className="text-sm text-[var(--muted-foreground)]">{(selected as any).description}</div>}
+              <div className="mt-auto">
+                <button className="w-full bg-green-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-green-700" onClick={() => onBook(selected)} disabled={booking === selected.id}>
+                  {booked === selected.id ? 'Booked!' : booking === selected.id ? 'Booking...' : 'Book'}
+                </button>
+                <button className="w-full mt-3 bg-gray-100 px-4 py-3 rounded-xl" onClick={onClose}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
   const quickSearch = async (cityValue: string) => {
     setLoading(true);
     setError(null);
@@ -44,7 +135,14 @@ export default function HotelsPage() {
     try {
       const results = await searchHotels({ city: cityValue, checkIn, checkOut, guests });
       setRawResponse(results);
-      setHotels(results);
+      const withPhotos = (results ?? []).filter((h: Hotel) => {
+        if (!h) return false;
+        const img = (h as any).images ?? (h as any).photos ?? (h as any).image;
+        if (!img) return false;
+        if (Array.isArray(img)) return img.length > 0;
+        return String(img).trim().length > 0;
+      });
+      setHotels(withPhotos);
     } catch (err: any) {
       const msg = err?.message || 'Failed to fetch hotels';
       setError(msg);
@@ -67,10 +165,40 @@ export default function HotelsPage() {
     }
   };
 
+  const openHotel = (hotel: Hotel) => setSelectedHotel(hotel);
+  const closeModal = () => setSelectedHotel(null);
+
+  // On mount, perform a random search if the user hasn't submitted a search yet
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const results = await fetchRandomHotels();
+        if (!mounted) return;
+        const withPhotos = (results ?? []).filter((h: Hotel) => {
+          if (!h) return false;
+          const img = (h as any).images ?? (h as any).photos ?? (h as any).image;
+          if (!img) return false;
+          if (Array.isArray(img)) return img.length > 0;
+          return String(img).trim().length > 0;
+        });
+        setHotels(withPhotos);
+      } catch (err) {
+        // silently ignore random search failures (user can search manually)
+        console.warn('Random hotels fetch failed:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <main className="min-h-screen bg-[var(--background)] pt-20 px-4">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-6" style={{ color: "var(--foreground)" }}>Find Hotels</h1>
+
         <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-[var(--surface)] p-6 rounded-2xl shadow">
           <input
             type="text"
@@ -110,6 +238,7 @@ export default function HotelsPage() {
             {loading ? "Searching..." : "Search"}
           </button>
         </form>
+
         {error && (
           <div className="mb-4 text-red-600">
             <div className="font-semibold">{error.split('\n')[0]}</div>
@@ -119,7 +248,6 @@ export default function HotelsPage() {
                 className="px-3 py-1 rounded bg-yellow-500 text-black font-semibold"
                 onClick={() => {
                   setError(null);
-                  // retry last search
                   (document.querySelector('form') as HTMLFormElement | null)?.dispatchEvent(new Event('submit', { cancelable: true }));
                 }}
               >
@@ -128,75 +256,38 @@ export default function HotelsPage() {
             </div>
           </div>
         )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {hotels.map((hotel) => {
-            // Normalize price display — some providers return { amount, currency } while others return a number and a separate currency field
-            let priceText = "";
-            try {
-              if (hotel && typeof hotel.price === "object" && hotel.price !== null) {
-                const amt = (hotel.price as any).amount ?? (hotel.price as any).value ?? "";
-                const cur = (hotel.price as any).currency ?? hotel.currency ?? "";
-                priceText = `${amt}${cur ? ` ${cur}` : ""}`;
-              } else {
-                const amt = hotel.price ?? "";
-                const cur = hotel.currency ?? "";
-                priceText = `${amt}${cur ? ` ${cur}` : ""}`;
-              }
-            } catch (e) {
-              priceText = String((hotel as any).price ?? "");
-            }
-
+            const imgSrc = Array.isArray((hotel as any).images) ? (hotel as any).images[0] : (hotel as any).image;
             return (
-              <div key={hotel.id} className="rounded-2xl shadow bg-[var(--surface)] p-6 flex flex-col">
-                {hotel.image && (
-                  <img src={hotel.image} alt={hotel.name} className="rounded-xl mb-4 w-full h-40 object-cover" />
-                )}
-                <h2 className="text-xl font-bold mb-1" style={{ color: "var(--foreground)" }}>{hotel.name}</h2>
-                <div className="text-sm mb-2" style={{ color: "var(--muted-foreground)" }}>
-                  {hotel.address}, {hotel.city}, {hotel.country}
+              <div key={hotel.id} className="overflow-hidden rounded-2xl shadow-lg bg-[var(--surface)] cursor-pointer" onClick={() => openHotel(hotel)}>
+                <div className="relative w-full h-56 md:h-72 lg:h-80">
+                  {imgSrc ? (
+                    <img src={imgSrc} alt={hotel.name} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gray-200" aria-hidden="true" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" aria-hidden="true" />
+                  <div className="absolute left-4 bottom-4 right-4">
+                    <h3 className="text-white text-lg md:text-xl font-semibold drop-shadow-lg truncate">{hotel.name}</h3>
+                    {hotel.city && <div className="text-sm text-white/90 mt-1 truncate">{hotel.city}</div>}
+                  </div>
                 </div>
-                <div className="text-lg font-semibold mb-2" style={{ color: "var(--foreground)" }}>{priceText}</div>
-                {hotel.description && (
-                  <div className="text-sm mb-2" style={{ color: "var(--muted-foreground)" }}>{hotel.description}</div>
-                )}
-                <button
-                  className={`mt-auto bg-green-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-700 transition-colors ${booking === hotel.id ? 'opacity-60' : ''}`}
-                  onClick={() => handleBook(hotel)}
-                  disabled={booking === hotel.id || booked === hotel.id}
-                >
-                  {booked === hotel.id ? "Booked!" : booking === hotel.id ? "Booking..." : "Book"}
-                </button>
               </div>
             );
           })}
         </div>
-        <div className="mt-6 mb-6 flex gap-2">
-          <button
-            className="px-3 py-1 rounded bg-gray-200 text-black font-semibold"
-            onClick={() => {
-              // quick sample search — call search directly so we can see results immediately
-              const inDate = new Date().toISOString().slice(0,10);
-              const outDate = new Date(Date.now() + 24*60*60*1000).toISOString().slice(0,10);
-              setCity('Paris');
-              setCheckIn(inDate);
-              setCheckOut(outDate);
-              quickSearch('Paris');
-            }}
-          >
-            Quick sample search (Paris)
-          </button>
-          <button
-            className="px-3 py-1 rounded bg-gray-200 text-black font-semibold"
-            onClick={() => setShowRaw((s) => !s)}
-          >
-            {showRaw ? 'Hide' : 'Show'} raw response
-          </button>
-        </div>
+
+        {selectedHotel && (
+          <Modal selected={selectedHotel} onClose={closeModal} onBook={handleBook} booking={booking} booked={booked} />
+        )}
         {showRaw && (
           <pre className="mt-6 p-4 bg-black text-white rounded max-w-3xl overflow-auto" style={{whiteSpace: 'pre-wrap'}}>
             {JSON.stringify(rawResponse ?? { message: 'no response yet' }, null, 2)}
           </pre>
         )}
+
         {hotels.length === 0 && !loading && (
           <div className="text-center text-gray-400 mt-12">No hotels found. Try searching for a different city.</div>
         )}
@@ -204,3 +295,6 @@ export default function HotelsPage() {
     </main>
   );
 }
+
+                        
+                 

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppBar from "../components/AppBar";
+import OfflineIndicator from "../components/OfflineIndicator";
 import { TranslationProvider } from "../lib/translation";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -32,7 +33,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
   <html lang={initialLang} dir="ltr" data-theme={initialTheme} suppressHydrationWarning>
+      <head>
+        {/* Link to the web manifest so browsers can install the PWA */}
+        <link rel="manifest" href="/manifest.json" />
+  {/* Apple touch icon hint (optional) */}
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/plane.png" />
+  {/* Favicon to avoid /favicon.ico 404 */}
+  <link rel="icon" href="/icons/plane.png" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {/* Service worker registration runs client-side only; Next will hydrate the register component */}
+        <noscript />
         <Script id="lang-init" strategy="beforeInteractive">
           {`
             try {
@@ -63,8 +74,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           `}
         </Script>
   <TranslationProvider>
-    <AppBar initialLang={initialLang} initialTheme={initialTheme} />
-    <div className="pt-16">{children}</div>
+  <AppBar initialLang={initialLang} initialTheme={initialTheme} />
+  <OfflineIndicator />
+  <div className="pt-16">{children}</div>
+    {/* Register the service worker on the client after hydration */}
+    <Script src="/sw-register.js" strategy="afterInteractive" />
   </TranslationProvider>
       </body>
     </html>
