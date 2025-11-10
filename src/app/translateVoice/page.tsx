@@ -544,250 +544,311 @@ export default function TranslateVoicePage() {
             }
 
             const timer = setTimeout(() => {
-                if (!translating) void translateText();
+                void translateText();
             }, 600);
 
             return () => clearTimeout(timer);
-        }, [originalText, sourceLang, targetLang, listening, translating]);
+        }, [originalText, sourceLang, targetLang, listening]);
 
     return (
-        <main className="min-h-screen pt-20 pb-12 px-6 bg-[var(--background)] text-[var(--foreground)]">
-            <div className="max-w-5xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-extrabold">Voice Translator</h1>
+        <main className="min-h-screen pt-16 pb-12 px-4 sm:px-6" style={{ background: "var(--background)", color: "var(--foreground)" }}>
+            <div className="max-w-6xl mx-auto">
+                {/* Header */}
+                <div className="mb-8 text-center">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 bg-gradient-to-r from-[#29D1FF] to-[#2EA7D9] bg-clip-text text-transparent">
+                        Voice Translator
+                    </h1>
+                    <p className="text-sm sm:text-base" style={{ color: "var(--muted-foreground)" }}>
+                        Speak naturally and get instant translations in 50+ languages
+                    </p>
                 </div>
 
-                <section className="grid grid-cols-12 gap-6">
-                    <div className="col-span-12 md:col-span-5">
-                        <div className="rounded-2xl p-6 bg-[var(--surface-muted)] border border-[var(--border)]">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="flex-1">
-                                    <p className="text-sm text-[var(--muted-foreground)]">Speak and translate</p>
-                                    <h2 className="text-lg font-semibold">Live voice → text</h2>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <select
-                                        value={sourceLang}
-                                        onChange={(e) => setSourceLang(e.target.value)}
-                                        className="text-sm px-3 py-2 rounded-md border bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100 focus:outline-none"
-                                        aria-label="Source language"
-                                    >
-                                        {languages.map((l) => (
-                                            <option key={l.code} value={l.code}>
-                                                {l.name} ({l.code.toUpperCase()})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-center">
-                                <button
-                                    onClick={onToggleListen}
-                                    className={`flex items-center justify-center w-40 h-40 rounded-full transition-transform shadow-md ${listening ? "bg-red-500 scale-95" : "bg-gradient-to-b from-[#6BD3FF] to-[#2EA7D9]"
-                                        }`}
-                                    aria-pressed={listening}
-                                    aria-label="Start speaking"
+                {/* Main Translation Card */}
+                <div 
+                    className="rounded-3xl p-6 sm:p-8 mb-6 backdrop-blur-sm"
+                    style={{ 
+                        background: "var(--surface)", 
+                        border: "1px solid var(--border)",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.12)"
+                    }}
+                >
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-6 lg:gap-8">
+                        {/* Source Language Section */}
+                        <div className="space-y-4">
+                            {/* Language Selector */}
+                            <div className="flex items-center gap-3">
+                                <select
+                                    value={sourceLang}
+                                    onChange={(e) => setSourceLang(e.target.value)}
+                                    className="flex-1 text-sm sm:text-base px-4 py-2.5 rounded-xl border-2 transition-all outline-none font-semibold"
+                                    style={{ 
+                                        background: "var(--background)",
+                                        color: "var(--foreground)",
+                                        borderColor: "var(--border)"
+                                    }}
+                                    aria-label="Source language"
                                 >
-                                    {/* Microphone icon */}
-                                    <svg className="w-12 h-12 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                                        <path d="M12 14a3.5 3.5 0 0 0 3.5-3.5V6.5A3.5 3.5 0 0 0 12 3h0a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 14z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        <path d="M19 11v.5A7 7 0 0 1 5 11.5V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        <path d="M12 19v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        <path d="M8 23h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </button>
-
-                                <div className="mt-4 text-center">
-                                    <p className="text-sm text-[var(--muted-foreground)]">{listening ? "Listening..." : "Click to speak"}</p>
-                                </div>
-
-                                <div className="mt-4 flex gap-3">
-                                    <button
-                                        onClick={() => {
-                                            setOriginalText("");
-                                            setTranslatedText("");
-                                            setDetectedLangName(null);
-                                            if (inputRef.current) inputRef.current.value = "";
+                                    {languages.map((l) => (
+                                        <option key={l.code} value={l.code}>
+                                            {l.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {detectedLangName && (
+                                    <div 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap animate-in fade-in slide-in-from-top-2"
+                                        style={{ 
+                                            background: "linear-gradient(135deg, #29D1FF15, #2EA7D915)",
+                                            border: "1px solid #29D1FF30",
+                                            color: "#29D1FF"
                                         }}
-                                        className="px-8 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-md text-base font-medium shadow-sm hover:shadow-md"
                                     >
-                                        Clear
-                                    </button>
-                                </div>
+                                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 2l2 7h7l-5.5 4.5L18 21l-6-4.5L6 21l2.5-7.5L3 9h7l2-7z"/>
+                                        </svg>
+                                        <button
+                                            onClick={() => {
+                                                if (!detectedLangCode) return;
+                                                setSourceLang(detectedLangCode);
+                                                setDetectedLangCode(null);
+                                                setDetectedLangName(null);
+                                            }}
+                                            className="font-medium hover:underline"
+                                        >
+                                            {detectedLangName}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="col-span-12 md:col-span-7">
-                        <div className="rounded-2xl p-6 bg-[var(--surface-muted)] border border-[var(--border)] space-y-4">
-                            <div>
-                                <div className="flex items-center relative">
-                                    <div className="flex-1 min-w-0">
-                                        <label className="text-sm text-[var(--muted-foreground)] truncate">Recognized text</label>
-                                    </div>
-                                    {/* Small-screen (in-flow) badge — occupies layout and is only visible on small screens */}
-                                    <div
-                                        aria-hidden={!detectedLangName}
-                                        className={`ml-3 flex-shrink-0 flex items-center gap-2 text-xs px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--muted-foreground)] transition-opacity duration-200 ease-out max-w-[50%] truncate ${detectedLangName ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} md:hidden`}
-                                        style={{ willChange: 'opacity' }}
-                                    >
-                                        {/* Sparkles / AI icon to match the provided screenshot */}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" className="w-4 h-4 md:w-5 md:h-5 shrink-0 text-blue-500 dark:text-blue-400">
-                                            <path d="M11 2l1.2 2.8L15 6l-2.8 1.2L11 10l-1.2-2.8L7 6l2.8-1.2L11 2z" fill="currentColor" opacity="0.95" />
-                                            <path d="M19 6l.8 1.9L22 9l-2.2.9L19 12l-.8-1.9L16 9l2.2-.9L19 6z" fill="currentColor" opacity="0.9" />
-                                        </svg>
-                                        <span className="text-[var(--muted-foreground)] truncate">Langue source :</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!detectedLangCode) return;
-                                                setSourceLang(detectedLangCode);
-                                                // clear suggestion after accepting
-                                                setDetectedLangCode(null);
-                                                setDetectedLangName(null);
-                                            }}
-                                            className="ml-1 text-blue-600 dark:text-blue-400 font-normal hover:underline truncate"
-                                        >
-                                            {detectedLangName}
-                                        </button>
-                                    </div>
-
-                                    {/* Md+ absolute badge — overlaid so it doesn't shift layout */}
-                                    <div
-                                        aria-hidden={!detectedLangName}
-                                        className={`hidden md:flex items-center gap-2 text-xs px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--muted-foreground)] transition-opacity transition-transform duration-200 ease-out max-w-[40%] ${detectedLangName ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-[6px] pointer-events-none'} md:absolute md:right-3 md:top-1/2 md:-translate-y-1/2`}
-                                        style={{ willChange: 'opacity, transform' }}
-                                    >
-                                        {/* Sparkles / AI icon */}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" className="w-4 h-4 md:w-5 md:h-5 shrink-0 text-blue-500 dark:text-blue-400">
-                                            <path d="M11 2l1.2 2.8L15 6l-2.8 1.2L11 10l-1.2-2.8L7 6l2.8-1.2L11 2z" fill="currentColor" opacity="0.95" />
-                                            <path d="M19 6l.8 1.9L22 9l-2.2.9L19 12l-.8-1.9L16 9l2.2-.9L19 6z" fill="currentColor" opacity="0.9" />
-                                        </svg>
-                                        <span className="text-[var(--muted-foreground)] truncate">Langue source :</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!detectedLangCode) return;
-                                                setSourceLang(detectedLangCode);
-                                                // clear suggestion after accepting
-                                                setDetectedLangCode(null);
-                                                setDetectedLangName(null);
-                                            }}
-                                            className="ml-1 text-blue-600 dark:text-blue-400 font-normal hover:underline truncate"
-                                        >
-                                            {detectedLangName}
-                                        </button>
-                                    </div>
-                                </div>
+                            {/* Voice Input Section */}
+                            <div className="relative">
                                 <textarea
                                     ref={inputRef}
                                     value={originalText}
                                     onChange={(e) => setOriginalText(e.target.value)}
-                                    rows={4}
-                                    placeholder="The voice recognition output will appear here..."
-                                    className="w-full mt-2 p-3 bg-[var(--surface)] rounded-md border border-[var(--border)] resize-none text-sm text-[var(--foreground)] placeholder-[color:var(--muted-foreground)] placeholder-opacity-90"
+                                    rows={6}
+                                    placeholder="Speak or type here..."
+                                    className="w-full p-4 rounded-2xl border-2 resize-none text-base sm:text-lg transition-all outline-none"
+                                    style={{ 
+                                        background: "var(--background)",
+                                        color: "var(--foreground)",
+                                        borderColor: listening ? "#29D1FF" : "var(--border)",
+                                        boxShadow: listening ? "0 0 0 3px rgba(41, 209, 255, 0.1)" : "none"
+                                    }}
                                 />
+                                
+                                {/* Mic Button - Floating inside textarea */}
+                                <button
+                                    onClick={onToggleListen}
+                                    className={`absolute bottom-4 right-4 w-14 h-14 rounded-full flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 ${
+                                        listening ? "animate-pulse" : ""
+                                    }`}
+                                    style={{ 
+                                        background: listening 
+                                            ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                                            : "linear-gradient(135deg, #29D1FF, #2EA7D9)",
+                                        boxShadow: listening
+                                            ? "0 10px 30px rgba(239, 68, 68, 0.4)"
+                                            : "0 10px 30px rgba(41, 209, 255, 0.3)"
+                                    }}
+                                    aria-pressed={listening}
+                                    title={listening ? "Stop listening" : "Start speaking"}
+                                >
+                                    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 14a3.5 3.5 0 0 0 3.5-3.5V6.5A3.5 3.5 0 0 0 12 3h0a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 14z" />
+                                        <path d="M19 11v.5A7 7 0 0 1 5 11.5V11" />
+                                        <path d="M12 19v4M8 23h8" />
+                                    </svg>
+                                </button>
                             </div>
 
-                            <div>
-                                <label className="text-sm text-[var(--muted-foreground)]">Translation ({targetLang.toUpperCase()})</label>
-                                <div className="mt-2 p-3 bg-[var(--surface)] rounded-md border border-[var(--border)] min-h-[96px] text-sm">
-                                    {translatedText ? (
-                                        <p>{translatedText}</p>
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+                                <span className="flex-1">
+                                    {listening ? (
+                                        <span className="flex items-center gap-2 text-[#29D1FF]">
+                                            <span className="flex gap-1">
+                                                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                                                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                                                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                                            </span>
+                                            Listening...
+                                        </span>
                                     ) : (
-                                        <p className="text-[var(--muted-foreground)]">Translation will appear here after recognition / when sent to the translator.</p>
+                                        "Click the mic to start"
                                     )}
-                                </div>
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        setOriginalText("");
+                                        setTranslatedText("");
+                                        setDetectedLangName(null);
+                                        if (inputRef.current) inputRef.current.value = "";
+                                    }}
+                                    className="px-4 py-1.5 rounded-lg hover:bg-opacity-80 transition-colors"
+                                    style={{ background: "var(--background)", border: "1px solid var(--border)" }}
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Swap Button */}
+                        <div className="hidden lg:flex items-center justify-center">
+                            <button
+                                onClick={() => {
+                                    const temp = sourceLang;
+                                    setSourceLang(targetLang);
+                                    setTargetLang(temp);
+                                    const tempText = originalText;
+                                    setOriginalText(translatedText);
+                                    setTranslatedText(tempText);
+                                }}
+                                className="p-3 rounded-full hover:bg-opacity-80 transition-all transform hover:rotate-180"
+                                style={{ background: "var(--background)", border: "2px solid var(--border)" }}
+                                title="Swap languages"
+                            >
+                                <svg className="w-5 h-5" style={{ color: "var(--muted-foreground)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M7 16V4M7 4L3 8M7 4l4 4" />
+                                    <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Target Language Section */}
+                        <div className="space-y-4">
+                            {/* Language Selector */}
+                            <div className="flex items-center gap-3">
+                                <select
+                                    value={targetLang}
+                                    onChange={(e) => setTargetLang(e.target.value)}
+                                    className="flex-1 text-sm sm:text-base px-4 py-2.5 rounded-xl border-2 transition-all outline-none font-semibold"
+                                    style={{ 
+                                        background: "var(--background)",
+                                        color: "var(--foreground)",
+                                        borderColor: "var(--border)"
+                                    }}
+                                    aria-label="Target language"
+                                >
+                                    {languages.map((l) => (
+                                        <option key={l.code} value={l.code}>
+                                            {l.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {translating && (
+                                    <div className="flex items-center gap-1.5 text-xs" style={{ color: "#29D1FF" }}>
+                                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                                            <path d="M12 2a10 10 0 0110 10" opacity="0.75"/>
+                                        </svg>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                <div className="text-sm text-[var(--muted-foreground)] mb-2 md:mb-0">
-                                    <p className="leading-relaxed">TripFlow — speak to translate: click the mic, then Translate or Listen.</p>
-                                </div>
-                                <div className="flex flex-col gap-3 w-full md:flex-row md:w-auto md:items-center">
-                                    <select
-                                        value={targetLang}
-                                        onChange={(e) => setTargetLang(e.target.value)}
-                                        className="text-sm px-3 py-2 rounded-md border bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100 focus:outline-none w-full md:w-auto"
-                                        aria-label="Target language (bottom)"
-                                    >
-                                        {languages.map((l) => (
-                                            <option key={l.code} value={l.code}>
-                                                {l.name} ({l.code.toUpperCase()})
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    <button
-                                        onClick={() => {
-                                            if (translatedText) {
-                                                // Try Clipboard API first
+                            {/* Translation Output */}
+                            <div 
+                                className="relative p-4 rounded-2xl border-2 min-h-[200px] text-base sm:text-lg"
+                                style={{ 
+                                    background: translatedText ? "linear-gradient(135deg, #29D1FF08, #2EA7D908)" : "var(--background)",
+                                    borderColor: "var(--border)"
+                                }}
+                            >
+                                {translatedText ? (
+                                    <p className="leading-relaxed">{translatedText}</p>
+                                ) : (
+                                    <p style={{ color: "var(--muted-foreground)", opacity: 0.6 }}>
+                                        Translation will appear here...
+                                    </p>
+                                )}
+                                
+                                {/* Action Buttons - Floating inside */}
+                                {translatedText && (
+                                    <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
                                                 if (navigator.clipboard && window.isSecureContext) {
-                                                    navigator.clipboard.writeText(translatedText).catch(() => {
-                                                        // fallback below
-                                                        const textarea = document.createElement('textarea');
-                                                        textarea.value = translatedText;
-                                                        textarea.style.position = 'fixed';
-                                                        textarea.style.opacity = '0';
-                                                        document.body.appendChild(textarea);
-                                                        textarea.focus();
-                                                        textarea.select();
-                                                        try {
-                                                            document.execCommand('copy');
-                                                        } catch {}
-                                                        document.body.removeChild(textarea);
-                                                    });
+                                                    navigator.clipboard.writeText(translatedText);
                                                 } else {
-                                                    // fallback for insecure context or unsupported clipboard
                                                     const textarea = document.createElement('textarea');
                                                     textarea.value = translatedText;
                                                     textarea.style.position = 'fixed';
                                                     textarea.style.opacity = '0';
                                                     document.body.appendChild(textarea);
-                                                    textarea.focus();
                                                     textarea.select();
-                                                    try {
-                                                        document.execCommand('copy');
-                                                    } catch {}
+                                                    document.execCommand('copy');
                                                     document.body.removeChild(textarea);
                                                 }
-                                            }
-                                        }}
-                                        className="px-3 py-2 rounded-md bg-white text-[#0b1724] border border-[#274158] dark:bg-slate-800 dark:text-slate-100 text-sm hover:shadow-sm w-full md:w-auto"
-                                        title="Copy translation"
-                                    >
-                                        Copy
-                                    </button>
+                                            }}
+                                            className="p-2.5 rounded-lg hover:bg-opacity-80 transition-all"
+                                            style={{ background: "var(--background)", border: "1px solid var(--border)" }}
+                                            title="Copy translation"
+                                        >
+                                            <svg className="w-4 h-4" style={{ color: "var(--muted-foreground)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (speaking) stopSpeaking();
+                                                else speakTranslation();
+                                            }}
+                                            className={`p-2.5 rounded-lg transition-all ${speaking ? 'animate-pulse' : ''}`}
+                                            style={{ 
+                                                background: speaking ? "#29D1FF" : "var(--background)",
+                                                border: `1px solid ${speaking ? "#29D1FF" : "var(--border)"}`,
+                                                color: speaking ? "white" : "var(--muted-foreground)"
+                                            }}
+                                            title={speaking ? "Stop" : "Listen"}
+                                        >
+                                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                {speaking ? (
+                                                    <>
+                                                        <rect x="6" y="4" width="4" height="16" rx="2"/>
+                                                        <rect x="14" y="4" width="4" height="16" rx="2"/>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                                                        <path d="M19 8a5 5 0 010 8" />
+                                                    </>
+                                                )}
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
 
-                                    <button
-                                        onClick={() => {
-                                            if (speaking) stopSpeaking();
-                                            else speakTranslation();
-                                        }}
-                                        disabled={!translatedText}
-                                        aria-pressed={speaking}
-                                        className={`p-2 rounded-md border text-sm flex items-center justify-center w-full md:w-auto ${speaking ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-[#0b1724] border-[#274158] dark:bg-slate-800 dark:text-slate-100'} hover:shadow-sm`}
-                                        title={speaking ? "Stop" : "Listen"}
-                                    >
-                                        {speaking ? (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M5 4a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1zm8 0a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1z" clipRule="evenodd" />
-                                            </svg>
-                                        ) : (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                                                <path d="M19 8a5 5 0 010 8" />
-                                            </svg>
-                                        )}
-                                    </button>
-                                </div>
+                            <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <path d="M12 6v6l4 2" />
+                                </svg>
+                                <span>Instant translation as you speak</span>
                             </div>
                         </div>
-
-                        <div className="mt-4 flex gap-3" />
                     </div>
-                </section>
+                </div>
+
+                {/* Info Banner */}
+                <div 
+                    className="rounded-2xl p-4 sm:p-6 text-center"
+                    style={{ 
+                        background: "linear-gradient(135deg, #29D1FF10, #2EA7D910)",
+                        border: "1px solid #29D1FF30"
+                    }}
+                >
+                    <div className="flex items-center justify-center gap-2 text-sm sm:text-base">
+                        <svg className="w-5 h-5 text-[#29D1FF]" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        <span style={{ color: "var(--foreground)" }}>
+                            Powered by <strong className="text-[#29D1FF]">TripFlow</strong> — Supporting 50+ languages with voice recognition
+                        </span>
+                    </div>
+                </div>
             </div>
         </main>
     );

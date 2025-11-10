@@ -89,37 +89,41 @@ export default function ProfileMenu() {
     const src = el?.src || photo || '';
     if (!src) return;
     imgErrorAttempts.current[src] = (imgErrorAttempts.current[src] || 0) + 1;
-    // Try cleaning the URL once
+    
+    // Try different strategies to load Google images
     if (imgErrorAttempts.current[src] === 1) {
-          // For Google avatar URLs, try adding a size parameter if missing
-          if (/googleusercontent\.com|lh3\.googleusercontent\.com|avatars\.googleusercontent\.com/i.test(src)) {
-            try {
-              const u = new URL(src);
-              if (!u.searchParams.has('sz') && !u.search) {
-                u.searchParams.set('sz', '256');
-                const withSize = u.toString();
-                setPhoto(withSize);
-                try { localStorage.setItem('user_profile_photo', withSize); } catch {}
-                return;
-              }
-            } catch {}
+      // For Google avatar URLs, try adding a size parameter if missing
+      if (/googleusercontent\.com|lh3\.googleusercontent\.com|avatars\.googleusercontent\.com/i.test(src)) {
+        try {
+          const u = new URL(src);
+          // Add size parameter if not present
+          if (!u.searchParams.has('sz') && !u.pathname.includes('=s')) {
+            u.searchParams.set('sz', '256');
+            const withSize = u.toString();
+            el.src = withSize;
+            setPhoto(withSize);
+            try { localStorage.setItem('user_profile_photo', withSize); } catch {}
+            return;
           }
+        } catch {}
+      }
     }
 
     if (imgErrorAttempts.current[src] === 2) {
+      // Try fetching through CORS proxy or with different cache settings
       try {
-        const res = await fetch(src, { cache: 'force-cache', mode: 'cors' });
+        const res = await fetch(src, { cache: 'reload', mode: 'cors' });
         if (res.ok) {
           const blob = await res.blob();
           if (blob && blob.type.startsWith('image')) {
             const obj = URL.createObjectURL(blob);
+            el.src = obj;
             setPhoto(obj);
-                try { if (!obj.startsWith('blob:')) localStorage.setItem('user_profile_photo', obj); } catch {}
             return;
           }
         }
       } catch (err) {
-        // ignore
+        console.warn('Image fetch failed:', err);
       }
     }
 

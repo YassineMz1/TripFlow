@@ -7,6 +7,7 @@ import AppBar from "../components/AppBar";
 import OfflineIndicator from "../components/OfflineIndicator";
 import OfflineFallback from "../components/OfflineFallback";
 import { TranslationProvider } from "../lib/translation";
+import TravelAssistant from "../components/TravelAssistant";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -102,6 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   <AppBar initialLang={initialLang} initialTheme={initialTheme} />
   <OfflineIndicator />
   <OfflineFallback message={"You're offline — viewing cached app shell"} />
+  <TravelAssistant />
   <div className="pt-16">{children}</div>
     {/* Register the service worker on the client after hydration */}
     <Script src="/sw-register.js" strategy="afterInteractive" />

@@ -7,6 +7,7 @@
   --muted-foreground: #475569; /* slate-600 */
   --border: rgba(0,0,0,0.15);
   --surface: rgba(0,0,0,0.04); /* subtle surfaces in light */
+  --surface-rgb: 0, 0, 0; /* For glassmorphism */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,6 +17,7 @@
     --muted-foreground: rgba(255,255,255,0.70);
     --border: rgba(255,255,255,0.25);
     --surface: rgba(255,255,255,0.10); /* subtle surfaces in dark */
+    --surface-rgb: 255, 255, 255; /* For glassmorphism */
   }
 }
 
@@ -25,6 +27,7 @@
   --muted-foreground: #475569;
   --border: rgba(0,0,0,0.15);
   --surface: rgba(0,0,0,0.04);
+  --surface-rgb: 0, 0, 0;
 }
 
 [data-theme="dark"] {
@@ -33,6 +36,7 @@
   --muted-foreground: rgba(255,255,255,0.70);
   --border: rgba(255,255,255,0.25);
   --surface: rgba(255,255,255,0.10);
+  --surface-rgb: 255, 255, 255;
 }
 
 html, body, #__next {
@@ -81,6 +85,10 @@ body {
   }
 }
 
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* Subtle bounce for pin emoji */
 @keyframes bounce-subtle {
   0%, 100% {
@@ -96,8 +104,6 @@ body {
 /* Browser compatibility helpers */
 /* Ensure consistent text-size behavior across browsers (Chrome, Edge, Safari) */
 html {
-  -webkit-text-size-adjust: 100%; /* iOS Safari, older WebKit */
-  -ms-text-size-adjust: 100%; /* IE/Edge legacy */
   text-size-adjust: 100%; /* standard */
 }
 

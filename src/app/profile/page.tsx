@@ -147,19 +147,25 @@ export default function ProfilePage() {
         setError(null);
         // This endpoint is public on the backend (no guards), so don't send Authorization
         // to avoid hitting 431 (Request Header Fields Too Large) when tokens become big.
-        const res = await fetch(withApiBase(`/user/getProfileByUserId/${userId}`), {
+        const profileUrl = withApiBase(`/user/getProfileByUserId/${userId}`);
+        console.log('[Profile] Fetching from:', profileUrl);
+        const res = await fetch(profileUrl, {
           method: 'GET',
           mode: 'cors',
           credentials: 'include',
           cache: "no-store",
         });
+        console.log('[Profile] Response status:', res.status);
         if (!res.ok) {
-          throw new Error(`Failed to load profile: ${res.status}`);
+          const errorText = await res.text().catch(() => '');
+          console.error('[Profile] Error response:', errorText);
+          throw new Error(`Failed to load profile: ${res.status} - ${errorText}`);
         }
         const json = await res.json();
+        console.log('[Profile] Loaded successfully:', json);
         setData(json as Profile);
       } catch (e: any) {
-        console.error("Profile load error", e);
+        console.error("[Profile] Load error:", e);
         // Use fallback data from JWT so the page is still usable
         setData(fallbackData);
         setError("Backend unavailable - showing cached data");
